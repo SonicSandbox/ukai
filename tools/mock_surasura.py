@@ -21,6 +21,7 @@ MAX_CLIP = 40 * 1024 * 1024
 class Handler(BaseHTTPRequestHandler):
     token = "test-token"
     busy = False
+    youtube_off = False
 
     def _send(self, code, obj):
         body = json.dumps(obj).encode("utf-8")
@@ -84,7 +85,28 @@ class Handler(BaseHTTPRequestHandler):
         print(f"[mock] done job={job['job']['job']} failed={failed}", flush=True)
         self._send(200, {"ok": True})
 
+    def _youtube(self):
+        n = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(n)
+        if self.headers.get("X-Surasura-Token") != self.token:
+            return self._send(401, {"ok": False})
+        if self.busy:
+            return self._send(503, {"ok": False})
+        if self.youtube_off:
+            return self._send(409, {"ok": False, "why": "The transcript downloader is off. Turn it on in Surasura and tick the risk box."})
+        try:
+            urls = json.loads(raw.decode("utf-8"))["urls"]
+            assert isinstance(urls, list) and 1 <= len(urls) <= 50, "1 to 50 links"
+            for u in urls:
+                assert re.match(r"https://(www\.)?youtube\.com/(watch\?v=|playlist\?list=)[\w-]+$", u), "bad link: " + str(u)
+        except Exception as e:  # noqa: BLE001
+            return self._send(400, {"ok": False, "why": str(e)})
+        print(f"[mock] youtube {urls}", flush=True)
+        self._send(200, {"ok": True, "queued": len(urls)})
+
     def do_POST(self):
+        if self.path == "/v1/youtube":
+            return self._youtube()
         if self.path.startswith("/v1/jobs/"):
             return self._job_post()
         if self.path != "/v1/online-subtitle":
@@ -123,6 +145,7 @@ if __name__ == "__main__":
     ap.add_argument("--token", default="test-token")
     ap.add_argument("--port", type=int, default=27631)
     ap.add_argument("--busy", action="store_true")
+    ap.add_argument("--youtube-off", action="store_true", help="answer 409 to /v1/youtube")
     ap.add_argument("--job-url", help="make a fixed v2 job for this watch URL, e.g. https://www.netflix.com/watch/81234567")
     ap.add_argument("--job-lines", default="60-63,120-124,300-303", help="start-end seconds, comma separated")
     a = ap.parse_args()
@@ -134,6 +157,6 @@ if __name__ == "__main__":
                            "pad_before": 1.0, "pad_after": 1.0, "lines": lines},
                    "missing": {l["n"] for l in lines}, "done": False}
         print(f"[mock] job 1: {len(lines)} lines for {a.job_url}", flush=True)
-    Handler.token, Handler.busy = a.token, a.busy
+    Handler.token, Handler.busy, Handler.youtube_off = a.token, a.busy, a.youtube_off
     print(f"[mock] listening on 127.0.0.1:{a.port}, token={a.token!r}", flush=True)
     HTTPServer(("127.0.0.1", a.port), Handler).serve_forever()

@@ -41,6 +41,14 @@ Per line it seeks to `start - pad_before` with the player's own API, waits until
 
 Try without Surasura: `python tools/mock_surasura.py --job-url https://www.netflix.com/watch/<id>` (lines via `--job-lines 60-63,120-124`); clips land in the system temp folder, in `mock_surasura_clips`.
 
+## Season, episode, cover, season walk, YouTube (v3)
+
+- **Season / episode** are read as numbers from Netflix's own player metadata (`videoMetadata`), not from page text. The popup shows what was detected and you can still edit it. A film sends no `show`. On Disney+ no player data source is known yet, so its numbers still come from the visible title text.
+- **Cover**: the title's own artwork from the same metadata (boxart), fetched by the page, at most 400 KB, sent with the first episode. If the player data has none, no cover is sent (the page's generic site image is never used).
+- **Send the whole season (EXPERIMENTAL, Netflix)**: Netflix only delivers an episode's subtitle file when that episode's page plays. So this walks the same tab through each episode of the season (muted, about 20-30 seconds each, roughly 10 minutes for 24 episodes), lets the player load the subtitles in the language you chose, posts each one, then returns to your episode. Switch subtitles on once for the show so Netflix remembers the language. Progress and Stop are in the popup; an episode without that language is reported and skipped. Not yet tried against a live account.
+- **YouTube**: on a watch page the popup offers "Send this video to Surasura", and on a playlist (or a watch page inside one) "Send the whole playlist". Only the link goes to `POST /v1/youtube`; nothing is recorded or downloaded here. If Surasura answers 409, its words are shown. The `youtube.com` host permission is used only to read the tab's address for that popup.
+- Scrollbars are hidden together with everything else while a clip is recorded.
+
 ## What it does and does not do
 
 - Reads only the subtitle text the page already receives (TTML/IMSC, WebVTT, HLS subtitle segments) by watching the page's own responses. It never requests anything from Netflix/Disney+ itself.

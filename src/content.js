@@ -62,10 +62,12 @@
 
   // The show's artwork as the page shows it (og:image), <= 400 KB, base64; null when it can't be had.
   async function getCover() {
-    const meta = document.querySelector('meta[property="og:image"]');
-    if (!meta || !meta.content) { log('cover: no og:image on this page'); return null; }
+    // the title's own artwork from the player's metadata; the page's generic og:image is not used
+    const pm = await callPage('meta');
+    const coverUrl = pm.result && pm.result.coverUrl;
+    if (!coverUrl) { log('cover: the player data has no artwork for this title'); return null; }
     try {
-      const r = await fetch(new URL(meta.content, location.href).href);
+      const r = await fetch(new URL(coverUrl, location.href).href);
       if (!r.ok) throw new Error('HTTP ' + r.status);
       let blob = await r.blob();
       if (blob.size > 400000 || !/^image\/(jpeg|png)$/.test(blob.type)) {
@@ -152,6 +154,7 @@
     if (m && m.type === 'getState') reply(state());
     else if (m && m.type === 'getCues') reply({ cues: cuesOf(m.key) });
     else if (m && m.type === 'player') { callPage(m.op, m.args).then(reply); return true; }
+    else if (m && m.type === 'getMeta') { callPage('meta').then((r) => reply({ meta: r.result || null })); return true; }
     else if (m && m.type === 'getCover') { getCover().then((cover) => reply({ cover })); return true; }
     return false;
   });

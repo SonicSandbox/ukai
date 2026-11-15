@@ -11,6 +11,11 @@
     seek(t) { player().seek(Math.round(t * 1000)); },
     play() { player().play(); },
     pause() { player().pause(); },
+    meta() {
+      const id = (location.pathname.match(/\/watch\/(\d+)/) || [])[1];
+      const vm = window.netflix.appContext.state.playerApp.getState().videoPlayer.videoMetadata;
+      return id ? self.SurasuraMeta.netflixMeta(vm, id) : null;
+    },
     blocker() {
       return document.querySelector('[data-uia="interrupt-autoplay-paused"]') ? 'are-you-still-watching' : null;
     },

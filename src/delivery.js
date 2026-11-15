@@ -133,7 +133,22 @@
     }
   }
 
-  const api = { BASE, hello, post, deliver, flush, keyOf, buildPayload, getJobs, postClip, postDone };
+  // -> {status:'ok', queued} | {status:'refused', why} (409) | badtoken | busy | offline | {status:'rejected', why}
+  async function postYoutube(token, urls, fetchFn) {
+    let r;
+    try {
+      r = await fetchFn(BASE + '/v1/youtube', { method: 'POST', headers: hdr(token, { 'Content-Type': 'application/json' }), body: JSON.stringify({ schema: 1, urls }) });
+    } catch (e) { return { status: 'offline' }; }
+    if (r.status === 401) return { status: 'badtoken' };
+    if (r.status === 503) return { status: 'busy' };
+    let j = null;
+    try { j = await r.json(); } catch (e) { /* ignore */ }
+    if (r.status === 200 && j && j.ok) return { status: 'ok', queued: j.queued };
+    if (r.status === 409) return { status: 'refused', why: (j && j.why) || 'Surasura said no' };
+    return { status: 'rejected', why: (j && j.why) || 'HTTP ' + r.status };
+  }
+
+  const api = { BASE, hello, post, deliver, flush, keyOf, buildPayload, getJobs, postClip, postDone, postYoutube };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SurasuraDelivery = api;
 })(typeof self !== 'undefined' ? self : globalThis);

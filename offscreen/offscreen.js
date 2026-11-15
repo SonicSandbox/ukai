@@ -102,9 +102,47 @@ async function startBatch(m) {
   }
 }
 
+// EXPERIMENTAL: send a whole Netflix season (see src/season.js). Needs no capture, only the tab.
+async function startSeason(m) {
+  stopFlag = false;
+  status = { state: 'running', progress: { kind: 'season', i: 0, n: m.episodes.length, title: '', done: 0 } };
+  const ask = async (msg) => {
+    const r = await relay({ type: 'content', tabId: m.tabId, msg });
+    if (!r || r.error) throw new Error((r && r.error) || 'no answer from the page');
+    return r;
+  };
+  const page = async (op, args) => (await ask({ type: 'player', op, args })).result;
+  const env = {
+    now: () => Date.now(),
+    sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+    shouldStop: () => stopFlag,
+    onProgress: (p) => { status = { state: 'running', progress: p }; },
+    navigate: (url) => relay({ type: 'navigate', tabId: m.tabId, url }),
+    getState: () => ask({ type: 'getState' }),
+    getCues: (key) => ask({ type: 'getCues', key }),
+    getMeta: async () => (await ask({ type: 'getMeta' })).meta,
+    getCover: async () => (await ask({ type: 'getCover' })).cover,
+    play: () => page('play'), pause: () => page('pause'), mute: (on) => page('mute', { on }),
+    build: (st, track, cues, meta, cover) => D.buildPayload(st, track, cues,
+      { title: meta && meta.title, show: meta && meta.show, season: meta && meta.season, episode: meta && meta.episode }, cover),
+    post: (payload) => D.post(payload, m.token, fetch),
+  };
+  try {
+    const r = await self.SurasuraSeason.walkSeason({ episodes: m.episodes, language: m.language, startId: m.startId }, env);
+    log('season finished:', JSON.stringify(r));
+    status = { state: 'finished', result: { kind: 'season', status: r.status, results: r.results } };
+  } catch (e) {
+    status = { state: 'finished', result: { kind: 'season', status: 'error', message: String((e && e.message) || e), results: [] } };
+  }
+}
+
 chrome.runtime.onMessage.addListener((m, _s, reply) => {
   if (!m || m.to !== 'offscreen') return false;
-  if (m.type === 'start') {
+  if (m.type === 'startSeason') {
+    if (status.state === 'running') { reply({ ok: false, why: 'already running' }); return false; }
+    startSeason(m);
+    reply({ ok: true });
+  } else if (m.type === 'start') {
     if (status.state === 'running') { reply({ ok: false, why: 'already running' }); return false; }
     startBatch(m);
     reply({ ok: true });

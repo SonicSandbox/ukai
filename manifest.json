@@ -14,6 +14,7 @@
   "host_permissions": [
     "*://*.netflix.com/*",
     "*://*.disneyplus.com/*",
+    "*://*.youtube.com/*",
     "http://127.0.0.1:27631/*"
   ],
   "background": {
@@ -34,6 +35,7 @@
       ],
       "js": [
         "src/hook.js",
+        "src/meta.js",
         "src/sites/netflix_page.js",
         "src/isolate.js",
         "src/bridge.js"

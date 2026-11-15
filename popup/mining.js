@@ -73,7 +73,7 @@ async function initMining(tab, st) {
 
   function renderRunning(bs) {
     const p = bs.progress || {};
-    const text = p.opening ? `Opening "${p.title}"…`
+    const text = p.kind === 'season' ? `Season walk: episode ${p.i} of ${p.n} (${p.title}), ${p.done} sent` : p.opening ? `Opening "${p.title}"…`
       : `Episode ${p.jobIndex || 1} of ${p.jobs || 1}: line ${p.line || 0} of ${p.lines || 0} (${p.recorded || 0} recorded, ${p.failed || 0} failed)`;
     const stop = el('button', 'Stop');
     stop.onclick = () => { chrome.runtime.sendMessage({ to: 'offscreen', type: 'stop' }); stop.disabled = true; };
@@ -82,6 +82,11 @@ async function initMining(tab, st) {
   }
 
   function describe(r) {
+    if (r.kind === 'season') {
+      const ok = r.results.filter((x) => x.ok).length;
+      const bad = r.results.filter((x) => !x.ok).map((x) => x.why);
+      return `Season walk ${r.status}: ${ok} episode(s) sent` + (bad.length ? `, ${bad.length} failed (${bad[0]})` : '') + (r.message ? '. ' + r.message : '') + '.';
+    }
     const done = (r.results || []).reduce((n, x) => n + x.recorded, 0);
     const failed = (r.results || []).reduce((n, x) => n + x.failed.length, 0);
     const base = `${done} clip(s) recorded, ${failed} line(s) failed.`;

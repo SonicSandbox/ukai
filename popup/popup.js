@@ -1,6 +1,6 @@
 const $ = (id) => document.getElementById(id);
 const D = self.SurasuraDelivery;
-let tab, st;
+let tab, st, meta;
 
 const WORDS = {
   added: ['Added to your Surasura library.', 'ok'],
@@ -24,6 +24,7 @@ async function init() {
     if (s && s.queued) $('queue').textContent = `${s.queued} subtitle(s) waiting for Surasura.`;
     if (s && !s.hasToken) say('No token yet. Open "Token / settings" and paste the one from Surasura.', 'bad');
   });
+  if (await initYoutube()) return;
   try {
     st = await chrome.tabs.sendMessage(tab.id, { type: 'getState' });
   } catch (e) {
@@ -52,11 +53,22 @@ async function init() {
     o.textContent = `${t.language || 'unknown language'} – ${t.count} cues`;
     $('track').appendChild(o);
   }
-  const i = st.info || {};
+  // the player's own data first (numbers for season / episode), the visible text only as a fallback
+  const mm = await chrome.tabs.sendMessage(tab.id, { type: 'getMeta' }).catch(() => null);
+  meta = (mm && mm.meta) || null;
+  const i = meta && (meta.title || meta.show) ? meta : st.info || {};
   $('title').value = i.title || st.docTitle || '';
-  $('show').value = i.show || '';
+  $('show').value = meta && meta.film ? '' : i.show || '';
   $('season').value = i.season ?? '';
   $('episode').value = i.episode ?? '';
+  $('detected').textContent = !meta ? 'Title, season and episode were read from the page text (check them).'
+    : meta.film ? 'Detected: a film (no season / episode).'
+    : `Detected from the player: ${meta.show || '?'} season ${meta.season ?? '?'} episode ${meta.episode ?? '?'}`;
+  if (meta && meta.episodes && meta.episodes.length > 1 && st.site === 'netflix') {
+    $('season').hidden = false;
+    $('season').textContent = `Send the whole season (${meta.episodes.length} episodes, experimental)`;
+    $('season').onclick = () => startSeason(meta);
+  }
   if (!i.title) say('The player has not shown the title yet (move the mouse over the video), so check the title here.');
   $('send').onclick = send;
 }
@@ -85,3 +97,46 @@ async function send() {
 
 $('probe').onclick = () => runProbe(tab, $('probeOut'), $('probe'));
 init();
+
+async function startSeason(m) {
+  const lang = st.tracks.find((t) => t.key === $('track').value).language;
+  const minutes = Math.ceil((m.episodes.length * 25) / 60);
+  if (!confirm(`EXPERIMENTAL. This walks THIS tab through all ${m.episodes.length} episodes of the season, one after another, muted, about 20-30 seconds each (roughly ${minutes} minutes). It sends the ${lang || ''} subtitles of each and then returns to this episode. Keep the tab open; you can Stop from this popup. Continue?`)) return;
+  const { token } = await chrome.storage.local.get('token');
+  const r = await chrome.runtime.sendMessage({
+    type: 'startSeason', tabId: tab.id, token, episodes: m.episodes, language: lang, startId: st.videoId,
+  });
+  if (!r || !r.ok) return say('Could not start: ' + ((r && r.why) || 'no answer'), 'bad');
+  say('The season walk has started. Open this popup again to see progress.');
+}
+
+// YouTube: only hands links to Surasura (POST /v1/youtube); nothing is recorded there.
+async function initYoutube() {
+  const l = self.SurasuraYoutube.parse(tab.url || '');
+  if (!l.video && !l.playlist) return false;
+  const box = $('yt');
+  box.hidden = false;
+  const btn = (text, urls) => {
+    const b = document.createElement('button');
+    b.textContent = text;
+    b.onclick = async () => {
+      b.disabled = true;
+      const { token } = await chrome.storage.local.get('token');
+      const r = await D.postYoutube(token, urls, fetch);
+      const words = {
+        ok: ['Sent to Surasura (' + r.queued + ' queued).', 'ok'],
+        refused: ['Surasura says: ' + r.why, 'bad'],
+        offline: ['Surasura is not running.', 'bad'],
+        busy: ['Surasura is busy. Try again in a moment.', 'bad'],
+        badtoken: ['Wrong or missing token (Token / settings).', 'bad'],
+        rejected: ['Surasura did not accept it: ' + r.why, 'bad'],
+      }[r.status];
+      say(words[0], words[1]);
+      b.disabled = false;
+    };
+    box.appendChild(b);
+  };
+  if (l.video) btn('Send this video to Surasura', [l.video]);
+  if (l.playlist) btn('Send the whole playlist', [l.playlist]);
+  return true;
+}

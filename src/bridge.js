@@ -11,6 +11,8 @@
     seek: (a) => (site.seek ? site.seek(a.t) : (video().currentTime = a.t)),
     play: () => (site.play ? site.play() : video().play()),
     pause: () => (site.pause ? site.pause() : video() && video().pause()),
+    meta: () => (site.meta ? site.meta() : null),
+    mute: (a) => { const v = video(); if (v) v.muted = !!a.on; },
     hideUi: () => {
       if (undoIsolate) return;
       const v = video();

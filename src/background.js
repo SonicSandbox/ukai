@@ -33,7 +33,7 @@ function loadComplete(tabId, timeoutMs) {
   });
 }
 
-const OWN = new Set(['send', 'status', 'startBatch', 'page', 'navigate', 'closeTab']);
+const OWN = new Set(['content', 'startSeason', 'send', 'status', 'startBatch', 'page', 'navigate', 'closeTab']);
 
 chrome.runtime.onMessage.addListener((m, _s, reply) => {
   if (!m || (m.to && m.to !== 'background') || !OWN.has(m.type)) return false; // not for us: let others answer
@@ -51,6 +51,13 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
       case 'startBatch': {
         await ensureOffscreen();
         return chrome.runtime.sendMessage(Object.assign({}, m, { to: 'offscreen', type: 'start' }));
+      }
+      case 'content': { // offscreen -> content script in the tab
+        try { return await chrome.tabs.sendMessage(m.tabId, m.msg); } catch (e) { return { error: String(e.message || e) }; }
+      }
+      case 'startSeason': {
+        await ensureOffscreen();
+        return chrome.runtime.sendMessage(Object.assign({}, m, { to: 'offscreen', type: 'startSeason' }));
       }
       case 'page': { // offscreen -> player in the tab
         try {

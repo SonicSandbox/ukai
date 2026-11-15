@@ -4,7 +4,8 @@
 (function (root) {
   const KEEP = 'data-surasura-keep';
   const ISO = 'data-surasura-iso';
-  const CSS = `html[${ISO}], html[${ISO}] body { background: #000 !important; }
+  const CSS = `html[${ISO}], html[${ISO}] body { background: #000 !important; overflow: hidden !important; scrollbar-width: none !important; }
+html[${ISO}]::-webkit-scrollbar, html[${ISO}] body::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
 html[${ISO}] body *:not([${KEEP}]) { visibility: hidden !important; }
 html[${ISO}] [${KEEP}] { visibility: visible !important; }`;
 
