@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Surasura subtitle sender",
+  "version": "0.1.0",
+  "description": "Sends the subtitles of the Netflix / Disney+ video you are watching to your local Surasura app.",
+  "minimum_chrome_version": "111",
+  "permissions": ["storage", "alarms", "tabCapture", "activeTab"],
+  "host_permissions": [
+    "*://*.netflix.com/*",
+    "*://*.disneyplus.com/*",
+    "http://127.0.0.1:27631/*"
+  ],
+  "background": { "service_worker": "src/background.js" },
+  "action": { "default_title": "Send to Surasura", "default_popup": "popup/popup.html" },
+  "options_ui": { "page": "options/options.html", "open_in_tab": true },
+  "content_scripts": [
+    {
+      "matches": ["*://*.netflix.com/*"],
+      "js": ["src/hook.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["*://*.netflix.com/*"],
+      "js": ["src/parsers.js", "src/sites/netflix.js", "src/content.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["*://*.disneyplus.com/*"],
+      "js": ["src/hook.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["*://*.disneyplus.com/*"],
+      "js": ["src/parsers.js", "src/sites/disneyplus.js", "src/content.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

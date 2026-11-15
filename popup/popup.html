@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Surasura</title>
+<style>
+  body{font:13px system-ui;width:340px;margin:10px}
+  h3{margin:12px 0 4px;font-size:13px}
+  label{display:block;margin:4px 0}
+  input,select{width:100%;box-sizing:border-box;padding:4px}
+  .row{display:flex;gap:6px}.row label{flex:1}
+  button{padding:6px 12px;margin-top:6px}
+  #msg{margin-top:8px;padding:6px;background:#eef;border-radius:4px;white-space:pre-wrap}
+  .bad{background:#fee!important}.ok{background:#efe!important}
+  .muted{color:#666}
+  img,audio{width:100%;margin-top:4px}
+  hr{margin:14px 0}
+</style>
+<div id="main">
+  <div id="none" hidden></div>
+  <div id="found" hidden>
+    <label>Subtitle track <select id="track"></select></label>
+    <label>Title <input id="title"></label>
+    <label>Show <input id="show" placeholder="(empty for a film)"></label>
+    <div class="row"><label>Season <input id="season" type="number" min="0"></label>
+    <label>Episode <input id="episode" type="number" min="0"></label></div>
+    <button id="send">Send to Surasura</button>
+  </div>
+  <div id="msg" hidden></div>
+  <div id="queue" class="muted"></div>
+  <a href="#" id="opts">Token / settings</a>
+</div>
+<hr>
+<h3>Capture probe (try by hand)</h3>
+<div class="muted">Records 5 s of this tab's audio and grabs one picture while the video plays. Nothing is saved or sent.</div>
+<button id="probe">Run capture probe</button>
+<div id="probeOut"></div>
+<script src="../src/delivery.js"></script>
+<script src="probe.js"></script>
+<script src="popup.js"></script>

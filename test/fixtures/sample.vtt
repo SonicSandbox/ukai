@@ -1,0 +1,19 @@
+WEBVTT
+X-TIMESTAMP-MAP=MPEGTS:900000,LOCAL:00:00:00.000
+
+NOTE this is a made-up test file
+
+1
+00:01.000 --> 00:03.500 align:center
+<c.yellow>おはよう</c.yellow>
+<i>ございます</i>
+
+2
+01:02:03.250 --> 01:02:05.000
+<v Taro>Hello there</v>
+General Kenobi &lt;3
+
+00:07.000 --> 00:08.000
+
+00:10.000 --> 00:11.000
+今日は{\an8}いい天気

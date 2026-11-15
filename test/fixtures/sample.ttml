@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling" xmlns:ttp="http://www.w3.org/ns/ttml#parameter" xml:lang="ja" ttp:tickRate="10000000">
+  <head><styling><style xml:id="s1" tts:color="white"/></styling></head>
+  <body>
+    <div>
+      <p begin="12340000t" end="15020000t" xml:id="p1"><span style="s1">こんにちは、<ruby>元気<rt>げんき</rt></ruby>？</span></p>
+      <p begin="00:00:20.500" end="00:00:22.000" xml:id="p2">ええ、<br/>元気です。</p>
+      <p begin="30s" dur="2.5s" xml:id="p3">Tom &amp; Jerry&#33;</p>
+      <p begin="40s" end="41s"/>
+      <p begin="50s" end="51s"><span> </span></p>
+    </div>
+  </body>
+</tt>
