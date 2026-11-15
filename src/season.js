@@ -48,8 +48,10 @@
           if (!ready) { results.push({ id: ep.id, ok: false, why: 'the episode page did not load' }); continue; }
         }
         try {
-          await env.mute(true);
-          await env.play();
+          // a fresh episode page has no player session for a moment: wait for it, then start (Netflix may autoplay anyway)
+          const up = await waitFor(env, () => env.playerReady(), 30000);
+          if (!up) { results.push({ id: ep.id, ok: false, why: 'the player did not start' }); continue; }
+          try { await env.mute(true); await env.play(); } catch (e) { /* autoplay may already be running */ }
           const found = await waitFor(env, async () => {
             const s = await env.getState();
             const t = s.tracks.find((x) => x.count > 0 && (!opts.language || x.language === opts.language));
@@ -70,6 +72,9 @@
           if (r.status === 'added' || r.status === 'exists') results.push({ id: ep.id, ok: true, status: r.status });
           else if (r.status === 'rejected') results.push({ id: ep.id, ok: false, why: 'Surasura did not accept it: ' + r.why });
           else { status = 'aborted'; results.push({ id: ep.id, ok: false, why: 'Surasura: ' + r.status }); break; }
+        } catch (e) {
+          if (e === STOP) throw e;
+          results.push({ id: ep.id, ok: false, why: 'error: ' + (e && e.message ? e.message : e) });
         } finally {
           try { await env.pause(); } catch (e) { /* ignore */ }
         }

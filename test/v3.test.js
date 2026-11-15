@@ -64,6 +64,7 @@ function world(opts = {}) {
     getCues: async () => ({ cues: [[0, 1, 'x']] }),
     getMeta: async () => ({ show: 'S', season: 1, episode: +w.url - 100, title: 't' + w.url }),
     getCover: async () => { w.covers++; return 'COVER'; },
+    playerReady: async () => (w.readyCalls = (w.readyCalls || 0) + 1) > 1,
     play: async () => { w.playing = true; }, pause: async () => { w.playing = false; },
     mute: async (on) => { w.muted.push(on); },
     build: (st, t, cues, meta, cover) => ({ video_id: st.videoId, language: t.language, episode: meta.episode, cover }),
@@ -119,4 +120,12 @@ test('netflixMeta finds the video in other entry shapes', () => {
     const m = M.netflixMeta({ 7: entry }, '7');
     assert.deepStrictEqual([m.show, m.season, m.episode], ['Alt', 3, 4]);
   }
+});
+
+test('season walk: waits for the player session; a throwing play() does not kill the walk', async () => {
+  const w = world();
+  w.env.play = async () => { throw new Error('netflix: no player session'); };
+  const r = await S.walkSeason({ episodes: eps, language: 'ja', startId: '101' }, w.env);
+  assert.strictEqual(r.status, 'done');
+  assert.strictEqual(r.results.filter((x) => x.ok).length, 3);
 });
