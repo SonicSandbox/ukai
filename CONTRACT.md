@@ -63,3 +63,23 @@ Body: `{"failed": [{"n": 1, "why": "seek failed"}]}` (empty list when every line
 
 ## Optional in v1's POST /v1/online-subtitle
 `"cover": "<base64 JPEG or PNG, at most 400 KB>"` — the show's artwork as the page shows it. Surasura may ignore it.
+
+---
+
+# v3 additions (draft)
+
+## POST /v1/youtube
+YouTube needs no recording: Surasura's own transcript downloader takes links. The extension only hands them over.
+Body: `{"schema": 1, "urls": ["https://www.youtube.com/watch?v=…", "https://www.youtube.com/playlist?list=…"]}`
+(1 to 50 links; a video, a list or a playlist, exactly what the downloader's own window takes).
+→ `200 {"ok": true, "queued": <n>}` — the downloader runs them as if pasted in its window; the transcripts arrive in
+the library as usual · `409 {"ok": false, "why": "..."}` when the downloader is off or its risk tick isn't given
+(the words say which) · `400` bad links · `401` · `503` busy.
+
+## The cover (v1's optional `cover`)
+Surasura stores it as the title's cover when the title has none of its own. The extension sends it with the first
+episode of a title it posts (and may send it with each).
+
+## A whole season
+No new call: the extension posts each episode with `POST /v1/online-subtitle`, one after another, slowest first
+(`503` → wait and retry). `show.season` and `show.episode` are numbers read from the player's own data.
