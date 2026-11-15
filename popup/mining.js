@@ -84,8 +84,8 @@ async function initMining(tab, st) {
   function describe(r) {
     if (r.kind === 'season') {
       const ok = r.results.filter((x) => x.ok).length;
-      const bad = r.results.filter((x) => !x.ok).map((x) => x.why);
-      return `Season walk ${r.status}: ${ok} episode(s) sent` + (bad.length ? `, ${bad.length} failed (${bad[0]})` : '') + (r.message ? '. ' + r.message : '') + '.';
+      const bad = r.results.filter((x) => !x.ok).map((x) => `${x.id}: ${x.why}`);
+      return `Season walk ${r.status}: ${ok} episode(s) sent` + (bad.length ? `, ${bad.length} failed (${bad.slice(0, 4).join('; ')})` : '') + (r.message ? '. ' + r.message : '') + '.';
     }
     const done = (r.results || []).reduce((n, x) => n + x.recorded, 0);
     const failed = (r.results || []).reduce((n, x) => n + x.failed.length, 0);
