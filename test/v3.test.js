@@ -112,3 +112,11 @@ test('season walk: Stop leaves the tab muted state restored and returns to start
   assert.strictEqual(w.posts.length, 1);
   assert.strictEqual(w.muted[w.muted.length - 1], false);
 });
+
+test('netflixMeta finds the video in other entry shapes', () => {
+  const v = { type: 'show', title: 'Alt', seasons: [{ seq: 3, episodes: [{ episodeId: 7, seq: 4, title: 'x' }] }] };
+  for (const entry of [{ video: v }, { _video: v }, { _metadata: { data: { video: v } } }, v]) {
+    const m = M.netflixMeta({ 7: entry }, '7');
+    assert.deepStrictEqual([m.show, m.season, m.episode], ['Alt', 3, 4]);
+  }
+});

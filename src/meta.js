@@ -14,17 +14,28 @@
     return null;
   }
 
+  // The entry's shape differs between player versions: look for the object that has the title and seasons.
+  function findVideo(o, depth) {
+    if (!o || typeof o !== 'object' || depth > 4) return null;
+    if (Array.isArray(o.seasons) || (o.type && o.title && typeof o.title === 'string')) return o;
+    for (const k of ['video', '_video', '_metadata', 'metadata', 'data', 'value']) {
+      const r = findVideo(o[k], depth + 1);
+      if (r) return r;
+    }
+    return null;
+  }
+
   // Netflix: playerApp.getState().videoPlayer.videoMetadata[id]._metadata.video
   // -> {film, show, season, episode, title, coverUrl, episodes:[{id,seq,title}]} | null
   function netflixMeta(videoMetadata, id) {
     const entry = videoMetadata && (videoMetadata[id] || videoMetadata[String(id)]);
-    const v = entry && ((entry._metadata && entry._metadata.video) || entry.video);
+    const v = findVideo(entry, 0);
     if (!v) return null;
     const coverUrl = pickArt(v);
     if (v.type === 'movie' || !Array.isArray(v.seasons)) return { film: true, title: v.title || null, coverUrl };
     for (const s of v.seasons) {
       for (const e of s.episodes || []) {
-        if (String(e.id) === String(id)) {
+        if (String(e.id) === String(id) || String(e.episodeId) === String(id) || String(e.videoId) === String(id)) {
           return {
             film: false, show: v.title || null, season: Number.isFinite(+s.seq) ? +s.seq : null,
             episode: Number.isFinite(+e.seq) ? +e.seq : null, title: e.title || null, coverUrl,
@@ -36,7 +47,7 @@
     return { film: false, show: v.title || null, coverUrl };
   }
 
-  const api = { netflixMeta, pickArt };
+  const api = { netflixMeta, pickArt, findVideo };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SurasuraMeta = api;
 })(typeof self !== 'undefined' ? self : globalThis);

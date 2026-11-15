@@ -17,7 +17,11 @@
       const vm = ps && ps.videoPlayer && ps.videoPlayer.videoMetadata;
       if (!vm) throw new Error('no videoMetadata; videoPlayer keys: ' + Object.keys((ps && ps.videoPlayer) || {}).join(','));
       const m = id ? self.SurasuraMeta.netflixMeta(vm, id) : null;
-      if (!m) throw new Error('no entry for ' + id + '; metadata ids: ' + Object.keys(vm).slice(0, 8).join(','));
+      if (!m) {
+        const e = vm[id] || {};
+        const keys = (o) => (o && typeof o === 'object' ? Object.keys(o).slice(0, 15).join(',') : typeof o);
+        throw new Error('entry has no video data; entry keys: ' + keys(e) + '; _metadata keys: ' + keys(e._metadata) + '; video keys: ' + keys(e._metadata && e._metadata.video));
+      }
       return m;
     },
     blocker() {
