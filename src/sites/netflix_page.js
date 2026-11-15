@@ -24,6 +24,7 @@
       }
       return m;
     },
+    ready() { try { player(); return true; } catch (e) { return false; } },
     blocker() {
       return document.querySelector('[data-uia="interrupt-autoplay-paused"]') ? 'are-you-still-watching' : null;
     },

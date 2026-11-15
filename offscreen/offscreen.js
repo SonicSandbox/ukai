@@ -123,7 +123,7 @@ async function startSeason(m) {
     getMeta: async () => (await ask({ type: 'getMeta' })).meta,
     getCover: async () => (await ask({ type: 'getCover' })).cover,
     play: () => page('play'), pause: () => page('pause').catch(() => {}), mute: (on) => page('mute', { on }),
-    playerReady: async () => { const s = await page('state'); return s && s.ok && s.readyState >= 2; },
+    playerReady: async () => { const s = await page('state'); return s && s.ok && s.apiReady && s.readyState >= 2; },
     build: (st, track, cues, meta, cover) => D.buildPayload(st, track, cues,
       { title: meta && meta.title, show: meta && meta.show, season: meta && meta.season, episode: meta && meta.episode }, cover),
     post: (payload) => D.post(payload, m.token, fetch),
