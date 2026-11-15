@@ -48,7 +48,54 @@
       parsed.timestampMap ? '(' + parsed.timestampMap + ')' : '');
   }
 
+  // commands to the page-world player bridge (src/bridge.js)
+  let seq = 0;
+  const pending = new Map();
+  function callPage(op, args) {
+    return new Promise((resolve) => {
+      const id = ++seq;
+      const timer = setTimeout(() => { pending.delete(id); resolve({ error: 'the page did not answer' }); }, 8000);
+      pending.set(id, (m) => { clearTimeout(timer); resolve(m); });
+      window.postMessage({ source: 'surasura-cmd', id, op, args }, '*');
+    });
+  }
+
+  // The show's artwork as the page shows it (og:image), <= 400 KB, base64; null when it can't be had.
+  async function getCover() {
+    const meta = document.querySelector('meta[property="og:image"]');
+    if (!meta || !meta.content) { log('cover: no og:image on this page'); return null; }
+    try {
+      const r = await fetch(new URL(meta.content, location.href).href);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      let blob = await r.blob();
+      if (blob.size > 400000 || !/^image\/(jpeg|png)$/.test(blob.type)) {
+        const bmp = await createImageBitmap(blob);
+        const cv = document.createElement('canvas');
+        cv.width = Math.min(480, bmp.width); cv.height = Math.round((bmp.height * cv.width) / bmp.width);
+        cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+        blob = await new Promise((res) => cv.toBlob(res, 'image/jpeg', 0.8));
+      }
+      if (!blob || blob.size > 400000) return null;
+      const b64 = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(String(fr.result).split(',')[1]);
+        fr.onerror = rej;
+        fr.readAsDataURL(blob);
+      });
+      log('cover: ' + Math.round(blob.size / 1024) + ' KB');
+      return b64;
+    } catch (e) {
+      log('cover not available:', e.message);
+      return null;
+    }
+  }
+
   window.addEventListener('message', (ev) => {
+    if (ev.source === window && ev.data && ev.data.source === 'surasura-reply') {
+      const f = pending.get(ev.data.id);
+      if (f) { pending.delete(ev.data.id); f(ev.data); }
+      return;
+    }
     if (ev.source !== window || !ev.data || ev.data.source !== 'surasura-hook') return;
     try {
       if (ev.data.kind === 'text') onText(ev.data);
@@ -104,6 +151,8 @@
   chrome.runtime.onMessage.addListener((m, _s, reply) => {
     if (m && m.type === 'getState') reply(state());
     else if (m && m.type === 'getCues') reply({ cues: cuesOf(m.key) });
+    else if (m && m.type === 'player') { callPage(m.op, m.args).then(reply); return true; }
+    else if (m && m.type === 'getCover') { getCover().then((cover) => reply({ cover })); return true; }
     return false;
   });
 

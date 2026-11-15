@@ -29,6 +29,7 @@ async function init() {
   } catch (e) {
     st = null;
   }
+  initMining(tab, st);
   if (!st) {
     $('none').hidden = false;
     $('none').textContent = 'Open a Netflix or Disney+ watch page (reload it once after installing the extension), start the video with subtitles on, then open this again.';
@@ -65,9 +66,10 @@ async function send() {
   try {
     const track = st.tracks.find((t) => t.key === $('track').value);
     const { cues } = await chrome.tabs.sendMessage(tab.id, { type: 'getCues', key: track.key });
+    const cv = await chrome.tabs.sendMessage(tab.id, { type: 'getCover' }).catch(() => null);
     const payload = D.buildPayload(st, track, cues, {
       title: $('title').value, show: $('show').value, season: $('season').value, episode: $('episode').value,
-    });
+    }, cv && cv.cover);
     const r = await chrome.runtime.sendMessage({ type: 'send', payload });
     if (r.status === 'rejected') say('Surasura did not accept it: ' + r.why, 'bad');
     else if (r.status === 'error') say('Something went wrong: ' + r.why, 'bad');

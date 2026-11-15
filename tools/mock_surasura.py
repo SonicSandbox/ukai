@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
-"""Mock of Surasura's local receiver (CONTRACT.md v1). Standard library only.
+"""Mock of Surasura's local receiver (CONTRACT.md v1 + v2 jobs). Standard library only.
 
     python tools/mock_surasura.py [--token test-token] [--port 27631] [--busy]
 
-Subtitles are kept in memory and printed; --busy answers 503 to every POST.
+Subtitles are kept in memory and printed; --busy answers 503. --job-url makes a v2 job; clips go to %TEMP%/mock_surasura_clips.
 """
 import argparse
 import json
+import os
+import re
+import tempfile
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 LIBRARY = {}  # (site, video_id) -> payload
+JOBS = {}  # job id -> {"job": {...}, "missing": set(n), "done": bool}
+CLIP_DIR = os.path.join(tempfile.gettempdir(), "mock_surasura_clips")
+MAX_CLIP = 40 * 1024 * 1024
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -25,12 +31,62 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if self.path == "/v1/jobs":
+            if self.headers.get("X-Surasura-Token") != self.token:
+                return self._send(401, {"ok": False})
+            if self.busy:
+                return self._send(503, {"ok": False})
+            jobs = []
+            for j in JOBS.values():
+                if j["done"]:
+                    continue
+                jobs.append(dict(j["job"], lines=[l for l in j["job"]["lines"] if l["n"] in j["missing"]]))
+            return self._send(200, {"jobs": jobs})
         if self.path == "/v1/hello":
-            self._send(200, {"app": "surasura", "version": "0.0.0-mock", "contract": 1, "languages": ["ja", "zh"]})
+            self._send(200, {"app": "surasura", "version": "0.0.0-mock", "contract": 2, "languages": ["ja", "zh"]})
         else:
             self._send(404, {"ok": False, "why": "not found"})
 
+    def _job_post(self):
+        m = re.fullmatch(r"/v1/jobs/(\d+)/(clips/(\d+)|done)", self.path)
+        if not m:
+            return self._send(404, {"ok": False, "why": "not found"})
+        if self.headers.get("X-Surasura-Token") != self.token:
+            return self._send(401, {"ok": False})
+        if self.busy:
+            return self._send(503, {"ok": False})
+        job = JOBS.get(int(m.group(1)))
+        n = int(self.headers.get("Content-Length", "0"))
+        if job is None or job["done"]:
+            self.rfile.read(n)
+            return self._send(404, {"ok": False, "why": "no such job"})
+        if m.group(3) is not None:
+            line = int(m.group(3))
+            if n > MAX_CLIP:
+                return self._send(413, {"ok": False})
+            body = self.rfile.read(n)
+            if line not in job["missing"]:
+                return self._send(404, {"ok": False, "why": "no such line"})
+            os.makedirs(CLIP_DIR, exist_ok=True)
+            path = os.path.join(CLIP_DIR, f"job{job['job']['job']}_line{line}.webm")
+            with open(path, "wb") as f:
+                f.write(body)
+            job["missing"].discard(line)
+            job.setdefault("meta", {})[line] = (self.headers.get("X-Clip-Start"), self.headers.get("X-Clip-End"))
+            print(f"[mock] clip job={job['job']['job']} line={line} {len(body)} bytes start={self.headers.get('X-Clip-Start')} "
+                  f"end={self.headers.get('X-Clip-End')} type={self.headers.get('Content-Type')} -> {path}", flush=True)
+            return self._send(200, {"ok": True})
+        try:
+            failed = json.loads(self.rfile.read(n).decode("utf-8"))["failed"]
+        except Exception as e:  # noqa: BLE001
+            return self._send(400, {"ok": False, "why": str(e)})
+        job["done"] = True
+        print(f"[mock] done job={job['job']['job']} failed={failed}", flush=True)
+        self._send(200, {"ok": True})
+
     def do_POST(self):
+        if self.path.startswith("/v1/jobs/"):
+            return self._job_post()
         if self.path != "/v1/online-subtitle":
             return self._send(404, {"ok": False, "why": "not found"})
         if self.headers.get("X-Surasura-Token") != self.token:
@@ -67,7 +123,17 @@ if __name__ == "__main__":
     ap.add_argument("--token", default="test-token")
     ap.add_argument("--port", type=int, default=27631)
     ap.add_argument("--busy", action="store_true")
+    ap.add_argument("--job-url", help="make a fixed v2 job for this watch URL, e.g. https://www.netflix.com/watch/81234567")
+    ap.add_argument("--job-lines", default="60-63,120-124,300-303", help="start-end seconds, comma separated")
     a = ap.parse_args()
+    if a.job_url:
+        site = "disneyplus" if "disneyplus" in a.job_url else "netflix"
+        vid = re.search(r"([0-9a-f]{8}-[0-9a-f-]{27}|\d+)(?:[?#].*)?$", a.job_url).group(1)
+        lines = [{"n": i, "start": float(r.split("-")[0]), "end": float(r.split("-")[1])} for i, r in enumerate(a.job_lines.split(","))]
+        JOBS[1] = {"job": {"job": 1, "site": site, "video_id": vid, "url": a.job_url, "title": "Mock episode",
+                           "pad_before": 1.0, "pad_after": 1.0, "lines": lines},
+                   "missing": {l["n"] for l in lines}, "done": False}
+        print(f"[mock] job 1: {len(lines)} lines for {a.job_url}", flush=True)
     Handler.token, Handler.busy = a.token, a.busy
     print(f"[mock] listening on 127.0.0.1:{a.port}, token={a.token!r}", flush=True)
     HTTPServer(("127.0.0.1", a.port), Handler).serve_forever()

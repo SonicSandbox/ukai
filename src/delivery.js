@@ -68,7 +68,7 @@
   }
 
   // info: {title, show, season, episode} (edited in the popup); strips the URL's query/hash.
-  function buildPayload(st, track, cues, info) {
+  function buildPayload(st, track, cues, info, cover) {
     const num = (v) => (v === '' || v == null || !Number.isFinite(+v) ? null : +v);
     const p = {
       schema: 1,
@@ -84,10 +84,56 @@
       if (num(info.season) != null) p.show.season = num(info.season);
       if (num(info.episode) != null) p.show.episode = num(info.episode);
     }
+    if (cover) p.cover = cover;
     return p;
   }
 
-  const api = { BASE, hello, post, deliver, flush, keyOf, buildPayload };
+  // ---- v2: jobs and clips ----
+  const hdr = (token, extra) => Object.assign({ 'X-Surasura-Token': token || '' }, extra || {});
+
+  // -> {status: 'ok', jobs} | {status: 'offline'|'badtoken'|'busy'|'unsupported'}
+  async function getJobs(token, fetchFn) {
+    try {
+      const r = await fetchFn(BASE + '/v1/jobs', { headers: hdr(token), cache: 'no-store' });
+      if (r.status === 401) return { status: 'badtoken' };
+      if (r.status === 503) return { status: 'busy' };
+      if (r.status === 404) return { status: 'unsupported' };
+      const j = await r.json();
+      return { status: 'ok', jobs: (j && j.jobs) || [] };
+    } catch (e) {
+      return { status: 'offline' };
+    }
+  }
+
+  // -> 'ok' | 'gone' (404: skip) | 'toolarge' | 'abort' (Surasura not answering / wrong token / busy)
+  async function postClip(token, job, n, blob, start, end, fetchFn) {
+    try {
+      const r = await fetchFn(BASE + '/v1/jobs/' + job + '/clips/' + n, {
+        method: 'POST',
+        headers: hdr(token, { 'Content-Type': 'video/webm', 'X-Clip-Start': String(start), 'X-Clip-End': String(end) }),
+        body: blob,
+      });
+      if (r.status === 200) return 'ok';
+      if (r.status === 404) return 'gone';
+      if (r.status === 413) return 'toolarge';
+      return 'abort';
+    } catch (e) {
+      return 'abort';
+    }
+  }
+
+  async function postDone(token, job, failed, fetchFn) {
+    try {
+      const r = await fetchFn(BASE + '/v1/jobs/' + job + '/done', {
+        method: 'POST', headers: hdr(token, { 'Content-Type': 'application/json' }), body: JSON.stringify({ failed }),
+      });
+      return r.status === 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  const api = { BASE, hello, post, deliver, flush, keyOf, buildPayload, getJobs, postClip, postDone };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SurasuraDelivery = api;
 })(typeof self !== 'undefined' ? self : globalThis);
