@@ -60,3 +60,12 @@ node tools/e2e_send.js            # simulated popup: fixture -> payload -> mock 
 Console messages start with `[surasura]` (page console for the content script, `chrome://extensions` → *service worker* for sending).
 
 Layout: `src/hook.js` (page side, listens to responses), `src/parsers.js`, `src/sites/netflix.js` and `src/sites/disneyplus.js` (one small adapter each), `src/content.js`, `src/delivery.js` (HTTP + retry queue), `src/background.js`, `src/walk.js` (mining state machine), `src/bridge.js` + `src/sites/*_page.js` (page-world player control), `offscreen/` (recorder), `popup/`, `options/`.
+
+## Licence and scope
+
+GPL-3.0-or-later; see [LICENSE](LICENSE).
+
+This is a personal study tool and is not affiliated with Netflix, Disney or Surasura's authors. It reads the
+subtitle text the player has already loaded and, for mining, records short clips of what plays in your own tab
+through the capture you grant in the browser. It downloads no video, removes no protection and talks only to
+Surasura on your own computer (`127.0.0.1`). Whether this fits a service's terms of use is for you to check.
