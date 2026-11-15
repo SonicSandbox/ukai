@@ -20,11 +20,11 @@ function world(opts = {}) {
     navigate: async (u) => { w.url = u; w.t = 0; },
     streamAlive: () => (opts.alive === undefined ? true : opts.alive),
     player: {
-      hideUi: async () => { w.hidden = true; },
+      hideUi: async () => { w.hidden = true; w.hiddenBeforeSeek = w.seekCalls === undefined; },
       showUi: async () => { w.hidden = false; },
       pause: async () => { w.playing = false; },
       play: async () => { w.playing = true; },
-      seek: async (t) => { if (opts.seekFails) return; w.seekAt = { t, ready: w.clock + 300 }; },
+      seek: async (t) => { w.seekCalls = (w.seekCalls || 0) + 1; if (opts.seekFails) return; w.seekAt = { t, ready: w.clock + 300 }; },
       state: async () => ({
         ok: true, t: w.t, paused: !w.playing, seeking: w.seekAt !== null, readyState: 4, url: w.url,
         blocker: opts.blocker && opts.blocker(w) ? 'are-you-still-watching' : null,
@@ -137,4 +137,11 @@ test('black picture / silence are failures with advice; UI is hidden while recor
   const w2 = world({ silent: true });
   await W.runBatch([job(1, [[0, 10, 12]])], w2.env);
   assert.match(w2.done[0].failed[0].why, /silence/);
+});
+
+test('UI is hidden before the first seek, and restored even when the line fails', async () => {
+  const w = world({ seekFails: true });
+  await W.runBatch([job(1, [[0, 10, 12]])], w.env);
+  assert.strictEqual(w.hiddenBeforeSeek, true);
+  assert.strictEqual(w.hidden, false);
 });

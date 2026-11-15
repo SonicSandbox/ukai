@@ -80,6 +80,7 @@ async function startBatch(m) {
       streamAlive: () => stream.getVideoTracks().some((t) => t.readyState === 'live'),
       player: {
         seek: (t) => page('seek', { t }), play: () => page('play'), pause: () => page('pause'),
+        hideUi: () => page('hideUi'), showUi: () => page('showUi'),
         state: () => page('state'),
       },
       recorder,

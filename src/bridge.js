@@ -6,16 +6,17 @@
     const vs = Array.from(document.querySelectorAll('video'));
     return vs.sort((a, b) => b.videoWidth * b.videoHeight - a.videoWidth * a.videoHeight)[0] || null;
   };
+  let undoIsolate = null;
   const ops = {
     seek: (a) => (site.seek ? site.seek(a.t) : (video().currentTime = a.t)),
     play: () => (site.play ? site.play() : video().play()),
     pause: () => (site.pause ? site.pause() : video() && video().pause()),
     hideUi: () => {
-      let st = document.getElementById('surasura-hide');
-      if (!st) { st = document.createElement('style'); st.id = 'surasura-hide'; document.documentElement.appendChild(st); }
-      st.textContent = (site.hideCss ? site.hideCss() : '') + ' { visibility: hidden !important; }';
+      if (undoIsolate) return;
+      const v = video();
+      if (v) undoIsolate = self.SurasuraIsolate.isolate(document, v);
     },
-    showUi: () => { const st = document.getElementById('surasura-hide'); if (st) st.remove(); },
+    showUi: () => { if (undoIsolate) { undoIsolate(); undoIsolate = null; } },
     state: () => {
       const v = video();
       return {

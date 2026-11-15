@@ -27,6 +27,16 @@
   const blockerNote = (s) => (s && s.blocker ? ` (${s.blocker})` : '');
 
   async function recordLine(job, line, env) {
+    // everything but the video is hidden from before the seek until the clip is done (also on failure / Stop)
+    if (env.player.hideUi) await env.player.hideUi().catch(() => {});
+    try {
+      return await recordLineInner(job, line, env);
+    } finally {
+      if (env.player.showUi) { try { await env.player.showUi(); } catch (e) { /* ignore */ } }
+    }
+  }
+
+  async function recordLineInner(job, line, env) {
     const P = env.player;
     const target = Math.max(0, line.start - job.pad_before);
     const endT = line.end + job.pad_after;
@@ -45,7 +55,6 @@
     }, 8000);
     if (!s) return { why: 'play did not start' + blockerNote(await P.state()) };
 
-    if (P.hideUi) await P.hideUi().catch(() => {});
     await env.recorder.start();
     let recording = true;
     try {
@@ -79,7 +88,6 @@
     } finally {
       if (recording) { try { await env.recorder.stop(); } catch (e) { /* ignore */ } }
       try { await P.pause(); } catch (e) { /* ignore */ }
-      if (P.showUi) await P.showUi().catch(() => {});
     }
   }
 

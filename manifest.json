@@ -35,6 +35,7 @@
       "js": [
         "src/hook.js",
         "src/sites/netflix_page.js",
+        "src/isolate.js",
         "src/bridge.js"
       ],
       "world": "MAIN",
@@ -58,6 +59,7 @@
       "js": [
         "src/hook.js",
         "src/sites/disneyplus_page.js",
+        "src/isolate.js",
         "src/bridge.js"
       ],
       "world": "MAIN",
