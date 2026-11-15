@@ -11,6 +11,10 @@
     seek(t) { player().seek(Math.round(t * 1000)); },
     play() { player().play(); },
     pause() { player().pause(); },
+    // the site's own subtitles and controls, hidden while a clip is recorded (selectors from public knowledge)
+    hideCss() {
+      return '.player-timedtext, .watch-video--bottom-controls-container, [data-uia="controls-standard"], [data-uia="video-title"], .watch-video--back-container';
+    },
     blocker() {
       return document.querySelector('[data-uia="interrupt-autoplay-paused"]') ? 'are-you-still-watching' : null;
     },

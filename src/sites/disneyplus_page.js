@@ -9,6 +9,9 @@
     seek(t) { const v = video(); if (!v) throw new Error('disney+: no video element'); v.currentTime = t; },
     play() { const v = video(); if (v) return v.play(); },
     pause() { const v = video(); if (v) v.pause(); },
+    hideCss() {
+      return '.btm-media-overlays-container, .controls__header, .controls__footer, [data-testid="title-field"], [data-testid="subtitle-field"], .dss-subtitle-renderer-cue-window';
+    },
     blocker() { return null; },
   };
   console.log('[surasura] disneyplus page player ready');

@@ -10,6 +10,12 @@
     seek: (a) => (site.seek ? site.seek(a.t) : (video().currentTime = a.t)),
     play: () => (site.play ? site.play() : video().play()),
     pause: () => (site.pause ? site.pause() : video() && video().pause()),
+    hideUi: () => {
+      let st = document.getElementById('surasura-hide');
+      if (!st) { st = document.createElement('style'); st.id = 'surasura-hide'; document.documentElement.appendChild(st); }
+      st.textContent = (site.hideCss ? site.hideCss() : '') + ' { visibility: hidden !important; }';
+    },
+    showUi: () => { const st = document.getElementById('surasura-hide'); if (st) st.remove(); },
     state: () => {
       const v = video();
       return {

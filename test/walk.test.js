@@ -20,6 +20,8 @@ function world(opts = {}) {
     navigate: async (u) => { w.url = u; w.t = 0; },
     streamAlive: () => (opts.alive === undefined ? true : opts.alive),
     player: {
+      hideUi: async () => { w.hidden = true; },
+      showUi: async () => { w.hidden = false; },
       pause: async () => { w.playing = false; },
       play: async () => { w.playing = true; },
       seek: async (t) => { if (opts.seekFails) return; w.seekAt = { t, ready: w.clock + 300 }; },
@@ -31,6 +33,7 @@ function world(opts = {}) {
     recorder: {
       start: async () => { w.rec = true; },
       stop: async () => { w.rec = false; return { size: opts.size === undefined ? 1000 : opts.size }; },
+      quality: () => ({ black: !!opts.black, silent: !!opts.silent }),
     },
     api: {
       postClip: async (job, n, blob, s, e) => { w.clips.push({ job: job.job, n, s, e }); return w.postResult; },
@@ -123,4 +126,15 @@ test('second episode: navigates; if the capture died, stop and ask for a click w
   assert.strictEqual(r2.status, 'done');
   assert.strictEqual(w2.url, 'https://x/watch/V2');
   assert.strictEqual(w2.done.length, 2);
+});
+
+test('black picture / silence are failures with advice; UI is hidden while recording and restored', async () => {
+  const w = world({ black: true });
+  await W.runBatch([job(1, [[0, 10, 12]])], w.env);
+  assert.match(w.done[0].failed[0].why, /black picture.*acceleration/);
+  assert.strictEqual(w.clips.length, 0);
+  assert.strictEqual(w.hidden, false);
+  const w2 = world({ silent: true });
+  await W.runBatch([job(1, [[0, 10, 12]])], w2.env);
+  assert.match(w2.done[0].failed[0].why, /silence/);
 });

@@ -45,6 +45,7 @@
     }, 8000);
     if (!s) return { why: 'play did not start' + blockerNote(await P.state()) };
 
+    if (P.hideUi) await P.hideUi().catch(() => {});
     await env.recorder.start();
     let recording = true;
     try {
@@ -67,6 +68,10 @@
       await P.pause();
       if (blob.size > MAX_CLIP) return { why: 'clip too large' };
       if (!blob.size) return { why: 'empty recording' };
+      const q = env.recorder.quality ? await env.recorder.quality() : {};
+      const tip = ' - turn off hardware/graphics acceleration in the browser settings and restart it';
+      if (q.black) return { why: 'recorded a black picture' + tip };
+      if (q.silent) return { why: 'recorded exact silence' + tip };
       const r = await env.api.postClip(job, line.n, blob, clipStart, clipEnd);
       if (r === 'abort') throw ABORT;
       if (r === 'toolarge') return { why: 'clip too large for Surasura' };
@@ -74,6 +79,7 @@
     } finally {
       if (recording) { try { await env.recorder.stop(); } catch (e) { /* ignore */ } }
       try { await P.pause(); } catch (e) { /* ignore */ }
+      if (P.showUi) await P.showUi().catch(() => {});
     }
   }
 

@@ -22,16 +22,43 @@ async function startBatch(m) {
     ctx = new AudioContext();
     ctx.createMediaStreamSource(stream).connect(ctx.destination);
 
+    // quality: was anything but silence / a black picture recorded during this clip?
+    const an = ctx.createAnalyser();
+    ctx.createMediaStreamSource(stream).connect(an);
+    const abuf = new Float32Array(an.fftSize);
+    let peak = 0, sampler = null;
+    const vid = document.createElement('video');
+    vid.muted = true;
+    vid.srcObject = new MediaStream(stream.getVideoTracks());
+    await vid.play();
+    const cv = document.createElement('canvas');
+    cv.width = 64; cv.height = 36;
+    const cg = cv.getContext('2d', { willReadFrequently: true });
+    let bright = 0;
+    const sample = () => {
+      an.getFloatTimeDomainData(abuf);
+      for (const v of abuf) peak = Math.max(peak, Math.abs(v));
+      if (vid.videoWidth) {
+        const w = vid.videoWidth, h = vid.videoHeight;
+        cg.drawImage(vid, w * 0.2, h * 0.2, w * 0.6, h * 0.6, 0, 0, 64, 36);
+        const d = cg.getImageData(0, 0, 64, 36).data;
+        for (let i = 0; i < d.length; i += 4) bright = Math.max(bright, d[i], d[i + 1], d[i + 2]);
+      }
+    };
+
     const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find((t) => MediaRecorder.isTypeSupported(t));
     let rec, chunks;
     const recorder = {
       start() {
-        chunks = [];
+        chunks = []; peak = 0; bright = 0;
+        sampler = setInterval(sample, 200);
         rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 1500000, audioBitsPerSecond: 96000 });
         rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
         return new Promise((res) => { rec.onstart = res; rec.start(500); });
       },
+      quality() { return { silent: peak < 1e-4, black: bright < 16 }; },
       stop() {
+        clearInterval(sampler);
         return new Promise((res) => {
           if (!rec || rec.state === 'inactive') return res(new Blob(chunks || [], { type: 'video/webm' }));
           rec.onstop = () => res(new Blob(chunks, { type: 'video/webm' }));
