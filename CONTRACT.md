@@ -32,3 +32,34 @@ The extension keeps a subtitle it couldn't deliver and tries again when Surasura
 
 ## Out of scope for v1
 No video or audio is ever downloaded or sent. Mining (recording clips while a line plays) is a later version.
+
+---
+
+# v2: mining after the fact (draft)
+
+Connect queues an episode's job as usual. For a `netflix` / `disneyplus` item it picks its words, then waits for the
+extension to record each picked line in the browser. Surasura then gives each clip to Anki Miner as it gives any
+video (one short video per line), so the cards are the same as all others. No video is downloaded: only what plays
+in the user's own tab is recorded, one short clip per line.
+
+All calls carry `X-Surasura-Token`, as v1. `hello` answers `"contract": 2` once these exist.
+
+## GET /v1/jobs
+→ `200 {"jobs": [{"job": 412, "site": "netflix", "video_id": "81234567", "url": "https://www.netflix.com/watch/81234567",
+   "title": "Show S01E03", "pad_before": 1.0, "pad_after": 1.0,
+   "lines": [{"n": 0, "start": 705.29, "end": 708.84}, {"n": 1, "start": 912.0, "end": 915.5}]}]}`
+Only jobs waiting for clips, oldest first. Times are seconds in the video, as the subtitle sent in v1 had them.
+`lines` holds only the lines still missing a clip.
+
+## POST /v1/jobs/<job>/clips/<n>
+Body: the clip's bytes, `Content-Type: video/webm` (video + audio, as `MediaRecorder` writes it). At most 40 MB.
+Headers: `X-Clip-Start: <seconds>` — the video time at the clip's first frame (so `start - pad_before`, as actually
+recorded), `X-Clip-End: <seconds>`.
+→ `200 {"ok": true}` · `404` no such job or line (dropped meanwhile: skip it) · `413` too large · `401` · `503` busy.
+
+## POST /v1/jobs/<job>/done
+Body: `{"failed": [{"n": 1, "why": "seek failed"}]}` (empty list when every line was recorded).
+→ `200 {"ok": true}`. Surasura makes the cards from the clips it has; a failed line is said plainly on the job.
+
+## Optional in v1's POST /v1/online-subtitle
+`"cover": "<base64 JPEG or PNG, at most 400 KB>"` — the show's artwork as the page shows it. Surasura may ignore it.
