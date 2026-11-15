@@ -56,18 +56,19 @@ async function init() {
   // the player's own data first (numbers for season / episode), the visible text only as a fallback
   const mm = await chrome.tabs.sendMessage(tab.id, { type: 'getMeta' }).catch(() => null);
   meta = (mm && mm.meta) || null;
+  const why = mm && mm.error;
   const i = meta && (meta.title || meta.show) ? meta : st.info || {};
   $('title').value = i.title || st.docTitle || '';
   $('show').value = meta && meta.film ? '' : i.show || '';
   $('season').value = i.season ?? '';
   $('episode').value = i.episode ?? '';
-  $('detected').textContent = !meta ? 'Title, season and episode were read from the page text (check them).'
+  $('detected').textContent = !meta ? 'Title, season and episode were read from the page text (check them).' + (why ? ' Player data: ' + why : '')
     : meta.film ? 'Detected: a film (no season / episode).'
     : `Detected from the player: ${meta.show || '?'} season ${meta.season ?? '?'} episode ${meta.episode ?? '?'}`;
   if (meta && meta.episodes && meta.episodes.length > 1 && st.site === 'netflix') {
-    $('season').hidden = false;
-    $('season').textContent = `Send the whole season (${meta.episodes.length} episodes, experimental)`;
-    $('season').onclick = () => startSeason(meta);
+    $('seasonBtn').hidden = false;
+    $('seasonBtn').textContent = `Send the whole season (${meta.episodes.length} episodes, experimental)`;
+    $('seasonBtn').onclick = () => startSeason(meta);
   }
   if (!i.title) say('The player has not shown the title yet (move the mouse over the video), so check the title here.');
   $('send').onclick = send;

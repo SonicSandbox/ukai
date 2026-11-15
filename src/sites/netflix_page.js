@@ -13,8 +13,12 @@
     pause() { player().pause(); },
     meta() {
       const id = (location.pathname.match(/\/watch\/(\d+)/) || [])[1];
-      const vm = window.netflix.appContext.state.playerApp.getState().videoPlayer.videoMetadata;
-      return id ? self.SurasuraMeta.netflixMeta(vm, id) : null;
+      const ps = window.netflix.appContext.state.playerApp.getState();
+      const vm = ps && ps.videoPlayer && ps.videoPlayer.videoMetadata;
+      if (!vm) throw new Error('no videoMetadata; videoPlayer keys: ' + Object.keys((ps && ps.videoPlayer) || {}).join(','));
+      const m = id ? self.SurasuraMeta.netflixMeta(vm, id) : null;
+      if (!m) throw new Error('no entry for ' + id + '; metadata ids: ' + Object.keys(vm).slice(0, 8).join(','));
+      return m;
     },
     blocker() {
       return document.querySelector('[data-uia="interrupt-autoplay-paused"]') ? 'are-you-still-watching' : null;

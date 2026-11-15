@@ -154,7 +154,7 @@
     if (m && m.type === 'getState') reply(state());
     else if (m && m.type === 'getCues') reply({ cues: cuesOf(m.key) });
     else if (m && m.type === 'player') { callPage(m.op, m.args).then(reply); return true; }
-    else if (m && m.type === 'getMeta') { callPage('meta').then((r) => reply({ meta: r.result || null })); return true; }
+    else if (m && m.type === 'getMeta') { callPage('meta').then((r) => { if (r.error) log('meta not available:', r.error); reply({ meta: r.result || null, error: r.error || null }); }); return true; }
     else if (m && m.type === 'getCover') { getCover().then((cover) => reply({ cover })); return true; }
     return false;
   });
