@@ -2,10 +2,12 @@
 (function (root) {
   // smallest artwork at least 300 px wide, else the largest one
   function pickArt(v) {
-    for (const k of ['boxart', 'artwork', 'storyart']) {
+    const keys = ['boxart', 'artwork', 'storyart'].concat(Object.keys(v).filter((k) => /art|image|poster|thumb|cover/i.test(k) && !['boxart', 'artwork', 'storyart'].includes(k)));
+    for (const k of keys) {
       const a = v[k];
+      if (typeof a === 'string' && /^https?:/.test(a)) return a;
       if (Array.isArray(a) && a.length) {
-        const ok = a.filter((x) => x && x.url);
+        const ok = a.filter((x) => x && x.url).map((x) => ({ w: x.w || x.width || 0, url: x.url }));
         const big = ok.filter((x) => (x.w || 0) >= 300).sort((x, y) => x.w - y.w)[0];
         const best = big || ok.sort((x, y) => (y.w || 0) - (x.w || 0))[0];
         if (best) return best.url;

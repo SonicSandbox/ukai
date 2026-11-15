@@ -88,7 +88,7 @@ async function send() {
     else if (r.status === 'error') say('Something went wrong: ' + r.why, 'bad');
     else {
       const [text, cls] = WORDS[r.status];
-      say(`${text}\n(${payload.title}, ${payload.language}, ${cues.length} cues)`, cls);
+      say(`${text}\n(${payload.title}, ${payload.language}, ${cues.length} cues)` + (payload.cover ? '\nCover sent.' : '\nNo cover: ' + ((cv && cv.why) || 'unknown')), cls);
     }
   } catch (e) {
     say('Something went wrong: ' + e, 'bad');

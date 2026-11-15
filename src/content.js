@@ -65,10 +65,11 @@
     // the title's own artwork from the player's metadata; the page's generic og:image is not used
     const pm = await callPage('meta');
     const coverUrl = pm.result && pm.result.coverUrl;
-    if (!coverUrl) { log('cover: the player data has no artwork for this title'); return null; }
+    const fail = (why) => { log('cover not sent:', why); return { cover: null, why }; };
+    if (!coverUrl) return fail('the player data has no artwork url' + (pm.error ? ' (' + pm.error + ')' : ''));
     try {
       const r = await fetch(new URL(coverUrl, location.href).href);
-      if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (!r.ok) return fail('image request gave HTTP ' + r.status);
       let blob = await r.blob();
       if (blob.size > 400000 || !/^image\/(jpeg|png)$/.test(blob.type)) {
         const bmp = await createImageBitmap(blob);
@@ -77,18 +78,17 @@
         cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
         blob = await new Promise((res) => cv.toBlob(res, 'image/jpeg', 0.8));
       }
-      if (!blob || blob.size > 400000) return null;
+      if (!blob || blob.size > 400000) return fail('image still over 400 KB');
       const b64 = await new Promise((res, rej) => {
         const fr = new FileReader();
         fr.onload = () => res(String(fr.result).split(',')[1]);
         fr.onerror = rej;
         fr.readAsDataURL(blob);
       });
-      log('cover: ' + Math.round(blob.size / 1024) + ' KB');
-      return b64;
+      log('cover: ' + Math.round(blob.size / 1024) + ' KB from ' + coverUrl.slice(0, 80));
+      return { cover: b64 };
     } catch (e) {
-      log('cover not available:', e.message);
-      return null;
+      return fail('could not fetch the image from the page (' + e.message + ')');
     }
   }
 
@@ -155,7 +155,7 @@
     else if (m && m.type === 'getCues') reply({ cues: cuesOf(m.key) });
     else if (m && m.type === 'player') { callPage(m.op, m.args).then(reply); return true; }
     else if (m && m.type === 'getMeta') { callPage('meta').then((r) => { if (r.error) log('meta not available:', r.error); reply({ meta: r.result || null, error: r.error || null }); }); return true; }
-    else if (m && m.type === 'getCover') { getCover().then((cover) => reply({ cover })); return true; }
+    else if (m && m.type === 'getCover') { getCover().then(reply); return true; }
     return false;
   });
 
