@@ -39,7 +39,7 @@ Per line it seeks to `start - pad_before` with the player's own API, waits until
 
 "Send to Surasura" also adds the show's artwork (`og:image`, fetched by the page, at most 400 KB) as `cover` when it can be had.
 
-Try without Surasura: `python tools/mock_surasura.py --job-url https://www.netflix.com/watch/<id>` (lines via `--job-lines 60-63,120-124`); clips land in `%TEMP%mock_surasura_clips`.
+Try without Surasura: `python tools/mock_surasura.py --job-url https://www.netflix.com/watch/<id>` (lines via `--job-lines 60-63,120-124`); clips land in the system temp folder, in `mock_surasura_clips`.
 
 ## What it does and does not do
 
