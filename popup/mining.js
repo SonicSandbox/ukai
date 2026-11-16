@@ -14,6 +14,17 @@ async function initMining(tab, st) {
     const j = await D.getJobs(token, fetch);
     const parts = [];
     if (bs && bs.state === 'finished') parts.push(el('p', describe(bs.result), { className: 'ok' }));
+    if (j.status === 'badtoken') {
+      // never hidden: a token Surasura no longer knows would leave episodes waiting with nothing said
+      parts.push(el('h3', 'Mining'));
+      parts.push(el('p', 'Surasura doesn\'t know this extension\'s token. In Surasura\'s settings, press *Copy token* ' +
+        '(Browser extension) and paste it into this extension\'s options, then open this popup again.',
+        { className: 'bad' }));
+      const b = el('button', 'Open options');
+      b.onclick = () => chrome.runtime.openOptionsPage();
+      parts.push(b);
+      return say(parts);
+    }
     if (j.status !== 'ok' || !j.jobs.length) {
       if (parts.length) say(parts);
       else box.hidden = true;
