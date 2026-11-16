@@ -1,24 +1,18 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>Surasura</title>
+<link rel="stylesheet" href="../ui/surasura.css">
 <style>
-  body{font:13px system-ui;width:340px;margin:10px}
-  h3{margin:12px 0 4px;font-size:13px}
-  label{display:block;margin:4px 0}
-  input,select{width:100%;box-sizing:border-box;padding:4px}
-  .row{display:flex;gap:6px}.row label{flex:1}
-  button{padding:6px 12px;margin-top:6px}
-  #msg{margin-top:8px;padding:6px;background:#eef;border-radius:4px;white-space:pre-wrap}
-  .bad{background:#fee!important}.ok{background:#efe!important}
-  .muted{color:#666}
-  img,audio{width:100%;margin-top:4px}
-  hr{margin:14px 0}
+  body{width:360px}
+  #probeOut img,#probeOut audio{width:100%;margin-top:4px}
 </style>
+<div class="brand"><img src="../icons/icon-32.png" alt=""><b>Surasura</b><span>to your library</span></div>
+<div class="page">
 <div id="yt" hidden></div>
 <div id="mining" hidden></div>
 <div id="main">
   <div id="none" hidden></div>
-  <div id="found" hidden>
+  <section id="found" hidden>
     <label>Subtitle track <select id="track"></select></label>
     <label>Title <input id="title"></label>
     <label>Show <input id="show" placeholder="(empty for a film)"></label>
@@ -27,16 +21,19 @@
     <div id="detected" class="muted"></div>
     <button id="send">Send to Surasura</button>
     <button id="seasonBtn" hidden>Send the whole season (experimental)</button>
-  </div>
+  </section>
   <div id="msg" hidden></div>
   <div id="queue" class="muted"></div>
   <a href="#" id="opts">Token / settings</a>
 </div>
 <hr>
-<h3>Capture probe (try by hand)</h3>
-<div class="muted">Records 5 s of this tab's audio and grabs one picture while the video plays. Nothing is saved or sent.</div>
-<button id="probe">Run capture probe</button>
-<div id="probeOut"></div>
+<details>
+  <summary>Capture probe (try by hand)</summary>
+  <div class="muted">Records 5 s of this tab's audio and grabs one picture while the video plays. Nothing is saved or sent.</div>
+  <button id="probe">Run capture probe</button>
+  <div id="probeOut"></div>
+</details>
+</div>
 <script src="../src/delivery.js"></script>
 <script src="../src/youtube.js"></script>
 <script src="probe.js"></script>
