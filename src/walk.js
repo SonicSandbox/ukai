@@ -140,8 +140,52 @@
     return { ok: true };
   }
 
-  // jobs in the order to walk. -> {status, results:[{job, status, recorded, failed}], message?}
+  const pageOf = (url) => String(url || '').split(/[?#]/)[0];
+
+  // Where the tab was when the batch began: its video's page and time. -> {url, t} | null
+  async function whereNow(env) {
+    const s = await env.player.state().catch(() => null);
+    return s && s.ok && s.url && typeof s.t === 'number' ? { url: s.url, t: s.t } : null;
+  }
+
+  // Back to the episode and the moment the learner was at before the batch, paused there. Best effort: never throws.
+  async function goBack(env, was) {
+    if (!was) return false;
+    const P = env.player;
+    const env2 = Object.assign({}, env, { shouldStop: () => false });
+    try {
+      let s = await P.state().catch(() => ({ ok: false }));
+      if (!(s.ok && pageOf(s.url) === pageOf(was.url))) {
+        await env.navigate(was.url);
+        s = await waitFor(env2, async () => {
+          const x = await P.state().catch(() => ({ ok: false }));
+          return x.ok && pageOf(x.url) === pageOf(was.url) && x.readyState >= 2 && x;
+        }, 45000, 500);
+        if (!s) return false;
+      }
+      await P.pause();
+      await P.seek(was.t);
+      await waitFor(env2, async () => {
+        const x = await P.state().catch(() => ({ ok: false }));
+        return x.ok && !x.seeking && Math.abs(x.t - was.t) <= 3 && x;
+      }, 15000);
+      await P.pause();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // jobs in the order to walk; afterwards the tab goes back to where it was (`goBack`), unless a click is needed to go
+  // on. -> {status, results:[{job, status, recorded, failed}], message?, back?}
   async function runBatch(jobs, env) {
+    const was = await whereNow(env);
+    const r = await runJobs(jobs, env);
+    if (r.status !== 'needs-click') r.back = await goBack(env, was);
+    return r;
+  }
+
+  async function runJobs(jobs, env) {
     const results = [];
     for (let j = 0; j < jobs.length; j++) {
       const job = jobs[j];
@@ -164,7 +208,7 @@
     return { status: 'done', results };
   }
 
-  const api = { walkJob, openJob, runBatch, STOP, ABORT };
+  const api = { walkJob, openJob, runBatch, goBack, STOP, ABORT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SurasuraWalk = api;
 })(typeof self !== 'undefined' ? self : globalThis);
