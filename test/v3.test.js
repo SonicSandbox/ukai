@@ -122,6 +122,23 @@ test('netflixMeta finds the video in other entry shapes', () => {
   }
 });
 
+test('season walk: an episode whose player data comes late is waited for; never coming, the season list fills it in', async () => {
+  // Sakamoto Days, 81664948: "entry has no video data" when its subtitles were already there
+  let tries = 0;
+  const w = world();
+  const real = w.env.getMeta;
+  w.env.getMeta = async () => {
+    if (w.url === '102' && ++tries < 4) throw new Error('entry has no video data');
+    if (w.url === '103') throw new Error('entry has no video data');
+    return real();
+  };
+  w.env.build = (st, t, cues, meta) => ({ video_id: st.videoId, show: meta.show, season: meta.season, episode: meta.episode, title: meta.title });
+  const r = await S.walkSeason({ episodes: eps, language: 'ja', startId: '101' }, w.env);
+  assert.strictEqual(r.results.filter((x) => x.ok).length, 3);
+  assert.deepStrictEqual(w.posts[1], { video_id: '102', show: 'S', season: 1, episode: 2, title: 't102' }, 'late: its own data');
+  assert.deepStrictEqual(w.posts[2], { video_id: '103', show: 'S', season: 1, episode: 3, title: 'E3' }, 'never: the season list');
+});
+
 test('season walk: waits for the player session; a throwing play() does not kill the walk', async () => {
   const w = world();
   w.env.play = async () => { throw new Error('netflix: no player session'); };

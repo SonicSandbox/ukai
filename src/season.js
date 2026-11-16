@@ -33,6 +33,7 @@
     const results = [];
     const n = opts.episodes.length;
     let status = 'done';
+    let known = null; // the show's metadata, read from an episode already walked
     try {
       for (let i = 0; i < n; i++) {
         const ep = opts.episodes[i];
@@ -65,7 +66,12 @@
           const s = await env.getState();
           const t = s.tracks.find((x) => x.key === found.t.key) || found.t;
           const { cues } = await env.getCues(t.key);
-          const meta = await env.getMeta();
+          // the player's metadata for a fresh episode can arrive after its subtitles: wait for it; still none, this
+          // episode's place from the season list on the show's metadata from an earlier episode
+          let meta = await waitFor(env, () => env.getMeta(), 15000);
+          if (!meta && known) meta = Object.assign({}, known, { episode: ep.seq ?? null, title: ep.title || null });
+          if (!meta) meta = await env.getMeta(); // (throws the player's own reason)
+          if (!meta.film && meta.show) known = { film: false, show: meta.show, season: meta.season, coverUrl: meta.coverUrl };
           const first = !results.some((r) => r.ok);
           const cover = first ? await env.getCover().catch(() => null) : null; // artwork goes with the first episode
           const r = await postWithRetry(env, env.build(s, t, cues, meta, cover));

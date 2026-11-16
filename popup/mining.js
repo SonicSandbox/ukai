@@ -2,32 +2,49 @@
 async function initMining(tab, st) {
   const box = document.getElementById('mining');
   const D = self.SurasuraDelivery;
-  const say = (html) => { box.hidden = false; box.replaceChildren(...html); };
+  // the box is drawn again only when what it shows changed (a click on a checkbox or a pressed button is kept)
+  let shown = null;
+  const say = (html, key) => {
+    if (key !== undefined && key === shown) return;
+    shown = key === undefined ? null : key;
+    box.hidden = false;
+    box.replaceChildren(...html);
+  };
+  const hide = () => { shown = 'hidden'; box.hidden = true; };
   const el = (tag, text, props) => Object.assign(document.createElement(tag), { textContent: text || '' }, props || {});
 
   const offStatus = () => chrome.runtime.sendMessage({ to: 'offscreen', type: 'status' }).catch(() => null);
 
+  // -> the ms until the next look (it keeps looking while the popup is open: nothing needs opening again)
   async function render() {
     const bs = await offStatus();
-    if (bs && bs.state === 'running') return renderRunning(bs);
+    if (bs && bs.state === 'running') { renderRunning(bs); return 1000; }
     const { token } = await chrome.storage.local.get('token');
     const j = await D.getJobs(token, fetch);
+    const key = JSON.stringify([bs && bs.state, bs && bs.state === 'finished' ? bs.result : null, j.status,
+      (j.jobs || []).map((x) => [x.job, x.lines.length])]);
+    if (key === shown) return 2000;
+    renderIdle(bs, j, token, key);
+    return 2000;
+  }
+
+  function renderIdle(bs, j, token, key) {
     const parts = [];
     if (bs && bs.state === 'finished') parts.push(el('p', describe(bs.result), { className: 'ok' }));
     if (j.status === 'badtoken') {
       // never hidden: a token Surasura no longer knows would leave episodes waiting with nothing said
       parts.push(el('h3', 'Mining'));
       parts.push(el('p', 'Surasura doesn\'t know this extension\'s token. In Surasura\'s settings, press *Copy token* ' +
-        '(Browser extension) and paste it into this extension\'s options, then open this popup again.',
+        '(Browser extension) and paste it into this extension\'s options. This box updates by itself.',
         { className: 'bad' }));
       const b = el('button', 'Open options');
       b.onclick = () => chrome.runtime.openOptionsPage();
       parts.push(b);
-      return say(parts);
+      return say(parts, key);
     }
     if (j.status !== 'ok' || !j.jobs.length) {
-      if (parts.length) say(parts);
-      else box.hidden = true;
+      if (parts.length) say(parts, key);
+      else hide();
       return;
     }
     const lines = j.jobs.reduce((n, x) => n + x.lines.length, 0);
@@ -58,6 +75,7 @@ async function initMining(tab, st) {
           openedTab: !!(opened && opened[tab.id]),
         });
         if (!r || !r.ok) return say([el('p', 'Could not start: ' + ((r && r.why) || 'no answer'), { className: 'bad' })]);
+        shown = null;
         render();
       };
       parts.push(b);
@@ -79,17 +97,22 @@ async function initMining(tab, st) {
       };
       parts.push(b);
     }
-    say(parts);
+    say(parts, key);
   }
 
+  let line = null; // the running box's progress line, updated in place (its Stop stays pressed)
   function renderRunning(bs) {
     const p = bs.progress || {};
-    const text = p.kind === 'season' ? `Season walk: episode ${p.i} of ${p.n} (${p.title}), ${p.done} sent` : p.opening ? `Opening "${p.title}"…`
+    const season = p.kind === 'season';
+    const text = season ? `Season walk: episode ${p.i} of ${p.n} (${p.title}), ${p.done} sent` : p.opening ? `Opening "${p.title}"…`
       : `Episode ${p.jobIndex || 1} of ${p.jobs || 1}: line ${p.line || 0} of ${p.lines || 0} (${p.recorded || 0} recorded, ${p.failed || 0} failed)`;
+    if (shown === 'running' && line) { line.textContent = text; return; }
+    line = el('p', text);
     const stop = el('button', 'Stop');
     stop.onclick = () => { chrome.runtime.sendMessage({ to: 'offscreen', type: 'stop' }); stop.disabled = true; };
-    say([el('h3', 'Mining'), el('p', text), el('p', 'Keep this tab open and the video visible. You can close this popup.', { className: 'muted' }), stop]);
-    setTimeout(render, 1000);
+    say([el('h3', season ? 'Season walk' : 'Mining'), line,
+      el('p', 'Keep this tab open' + (season ? '' : ' and the video visible') + '. You can close this popup.', { className: 'muted' }), stop],
+    'running');
   }
 
   function describe(r) {
@@ -108,5 +131,10 @@ async function initMining(tab, st) {
     return 'Stopped by an error: ' + (r.message || '') + ' ' + base;
   }
 
-  render();
+  (async function loop() {
+    let wait = 2000;
+    try { wait = await render(); } catch (e) { /* the next look tries again */ }
+    setTimeout(loop, wait);
+  })();
+  return { refresh: () => { shown = null; return render(); } };
 }

@@ -1,6 +1,6 @@
 const $ = (id) => document.getElementById(id);
 const D = self.SurasuraDelivery;
-let tab, st, meta;
+let tab, st, meta, mining;
 
 const WORDS = {
   added: ['Added to your Surasura library.', 'ok'],
@@ -20,17 +20,20 @@ function say(text, cls) {
 async function init() {
   $('opts').onclick = (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); };
   [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  chrome.runtime.sendMessage({ type: 'status' }).then((s) => {
-    if (s && s.queued) $('queue').textContent = `${s.queued} subtitle(s) waiting for Surasura.`;
-    if (s && !s.hasToken) say('No token yet. Open "Token / settings" and paste the one from Surasura.', 'bad');
-  });
+  let warned = false;
+  (async function queueLoop() { // the queue's line follows the background while the popup is open
+    const s = await chrome.runtime.sendMessage({ type: 'status' }).catch(() => null);
+    $('queue').textContent = s && s.queued ? `${s.queued} subtitle(s) waiting for Surasura.` : '';
+    if (s && !s.hasToken && !warned) { warned = true; say('No token yet. Open "Token / settings" and paste the one from Surasura.', 'bad'); }
+    setTimeout(queueLoop, 2000);
+  })();
   if (await initYoutube()) return;
   try {
     st = await chrome.tabs.sendMessage(tab.id, { type: 'getState' });
   } catch (e) {
     st = null;
   }
-  initMining(tab, st);
+  mining = await initMining(tab, st);
   if (!st) {
     $('none').hidden = false;
     const onSite = /:\/\/[^/]*(netflix\.com|disneyplus\.com)\//.test(tab.url || '');
@@ -118,7 +121,8 @@ async function startSeason(m) {
     type: 'startSeason', tabId: tab.id, token, episodes: m.episodes, language: lang, startId: st.videoId,
   });
   if (!r || !r.ok) return say('Could not start: ' + ((r && r.why) || 'no answer'), 'bad');
-  say('The season walk has started. Open this popup again to see progress.');
+  say('The season walk has started: its progress shows above and updates by itself.');
+  if (mining) mining.refresh();
 }
 
 // YouTube: only hands links to Surasura (POST /v1/youtube); nothing is recorded there.
