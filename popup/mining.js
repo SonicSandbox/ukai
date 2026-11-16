@@ -132,6 +132,7 @@ async function initMining(tab, st) {
   }
 
   (async function loop() {
+    try { if (!(chrome.runtime && chrome.runtime.id)) return; } catch (e) { return; } // reloaded under the popup: stop
     let wait = 2000;
     try { wait = await render(); } catch (e) { /* the next look tries again */ }
     setTimeout(loop, wait);

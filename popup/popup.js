@@ -10,6 +10,9 @@ const WORDS = {
   badtoken: ['Wrong or missing token. Paste the token from Surasura in "Token / settings". Kept here until it works.', 'bad'],
 };
 
+// false once the extension is reloaded or removed under an open popup (its calls would throw "context invalidated")
+const alive = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; } };
+
 function say(text, cls) {
   const m = $('msg');
   m.hidden = false;
@@ -22,9 +25,12 @@ async function init() {
   [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   let warned = false;
   (async function queueLoop() { // the queue's line follows the background while the popup is open
-    const s = await chrome.runtime.sendMessage({ type: 'status' }).catch(() => null);
-    $('queue').textContent = s && s.queued ? `${s.queued} subtitle(s) waiting for Surasura.` : '';
-    if (s && !s.hasToken && !warned) { warned = true; say('No token yet. Open "Token / settings" and paste the one from Surasura.', 'bad'); }
+    if (!alive()) return; // the extension was reloaded under this popup: nothing left to ask
+    try {
+      const s = await chrome.runtime.sendMessage({ type: 'status' }).catch(() => null);
+      $('queue').textContent = s && s.queued ? `${s.queued} subtitle(s) waiting for Surasura.` : '';
+      if (s && !s.hasToken && !warned) { warned = true; say('No token yet. Open "Token / settings" and paste the one from Surasura.', 'bad'); }
+    } catch (e) { /* the next look tries again */ }
     setTimeout(queueLoop, 2000);
   })();
   if (await initYoutube()) return;
