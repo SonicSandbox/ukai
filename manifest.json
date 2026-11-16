@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Surasura subtitle sender",
+  "name": "Ukai 鵜飼 · for Surasura",
   "version": "0.2.0",
-  "description": "Sends the subtitles of the Netflix / Disney+ video you are watching to your local Surasura app.",
+  "description": "Ukai, Surasura's watch companion: brings the subtitles and the clips of what you watch on Netflix, Disney+ and YouTube home to your local Surasura.",
   "minimum_chrome_version": "111",
   "permissions": [
     "storage",
@@ -31,7 +31,7 @@
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png"
     },
-    "default_title": "Send to Surasura",
+    "default_title": "Ukai: send to Surasura",
     "default_popup": "popup/popup.html"
   },
   "options_ui": {
@@ -94,7 +94,7 @@
       "suggested_key": {
         "default": "Alt+Shift+S"
       },
-      "description": "Open Surasura (also grants tab capture for the current tab)"
+      "description": "Open Ukai (also grants tab capture for the current tab)"
     }
   }
 }

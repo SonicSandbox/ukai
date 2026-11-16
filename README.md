@@ -1,4 +1,9 @@
-# Surasura subtitle sender (Chrome / Edge extension, v0.2)
+<img src="icons/icon-128.png" width="64" alt="">
+
+# Ukai 鵜飼 — Surasura's watch companion (Chrome / Edge extension, v0.2)
+
+The cormorant that fishes the river at night by torchlight and brings each fish home: Ukai brings the subtitles and
+clips of what you watch home to your local Surasura. Its gem is citrine, `#f5b73b`.
 
 Sends the subtitles of the Netflix or Disney+ video you are watching to your local Surasura app, so they land
 in the library like a YouTube transcript. Plain JavaScript, Manifest V3, no build step.

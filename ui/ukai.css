@@ -1,11 +1,12 @@
-/* Surasura's look (its night palette, app/theme.py): the popup and the options page share it. */
+/* Ukai 鵜飼's look: the Houseki family's night room (Surasura's palette, app/theme.py) with Ukai's own gem, citrine
+   #f5b73b, as its accent. The popup and the options page share it. */
 :root {
   --bg: #04060a; --surface: #0a0e14; --raised: #101621; --frame: #0c1017;
   --line: #161e2a; --line-hi: #243044;
   --ink: #e6ecf5; --ink-dim: #7d8aa2; --ink-faint: #56627a;
-  --accent: #62b6f2; --accent-deep: #2a6fa8; --accent-wash: #1a2a3a;
+  --accent: #f5b73b; --accent-deep: #d9961f; --accent-ink: #1a1203; --accent-wash: #2a2210;
   --ok: #7fcf9f; --warn: #e7bf72; --bad: #c02040; --bad-type: #f8f0e0;
-  --iris: linear-gradient(90deg, #36c9cf 0%, #4f9cf0 45%, #a98bff 100%);
+  --gem: linear-gradient(90deg, #ffd977 0%, #f5b73b 50%, #d9961f 100%);
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -15,8 +16,9 @@ body { font: 13px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-ser
 .brand { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--frame);
   border-bottom: 1px solid var(--line); }
 .brand img { width: 22px; height: 22px; }
-.brand b { font-size: 14px; font-weight: 600; background: var(--iris); -webkit-background-clip: text;
+.brand b { font-size: 14px; font-weight: 600; background: var(--gem); -webkit-background-clip: text;
   background-clip: text; color: transparent; }
+.brand i { font-style: normal; color: var(--ink-dim); font-size: 13px; }
 .brand span { color: var(--ink-faint); font-size: 12px; margin-left: auto; }
 
 .page { padding: 10px 12px 12px; }
@@ -36,8 +38,8 @@ input:focus, select:focus { border-color: var(--accent); }
 button { font: inherit; font-weight: 600; margin: 8px 6px 0 0; padding: 6px 14px; border-radius: 9px; cursor: pointer;
   color: var(--ink); background: var(--raised); border: 1px solid var(--line-hi); }
 button:hover { border-color: var(--accent); }
-button:first-of-type, button.primary { background: var(--accent-deep); border-color: var(--accent-deep); color: #fff; }
-button:first-of-type:hover, button.primary:hover { background: #3380bd; }
+button:first-of-type, button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button:first-of-type:hover, button.primary:hover { background: #ffc85a; border-color: #ffc85a; }
 button:disabled { opacity: .5; cursor: default; }
 
 a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
