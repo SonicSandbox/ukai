@@ -45,10 +45,10 @@ code { color: var(--accent); background: var(--accent-wash); padding: 1px 5px; b
 hr { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
 img, audio { max-width: 100%; }
 
-#msg { margin-top: 8px; padding: 7px 10px; border-radius: 9px; white-space: pre-wrap; background: var(--accent-wash);
+#main #msg { margin-top: 8px; padding: 7px 10px; border-radius: 9px; white-space: pre-wrap; background: var(--accent-wash);
   border: 1px solid var(--line-hi); }
-.ok { color: var(--ok); } #msg.ok, p.ok { background: #10241a; border: 1px solid #1d3a2a; padding: 7px 10px; border-radius: 9px; }
-.bad { color: var(--bad-type); } #msg.bad, p.bad { background: #3a0f1a; border: 1px solid var(--bad); padding: 7px 10px;
+.ok { color: var(--ok); } #main #msg.ok, p.ok { background: #10241a; border: 1px solid #1d3a2a; padding: 7px 10px; border-radius: 9px; }
+.bad { color: var(--bad-type); } #main #msg.bad, p.bad { background: #3a0f1a; border: 1px solid var(--bad); padding: 7px 10px;
   border-radius: 9px; }
 .muted { color: var(--ink-dim); }
 details > summary { color: var(--ink-faint); cursor: pointer; font-size: 12px; }

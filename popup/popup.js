@@ -33,7 +33,17 @@ async function init() {
   initMining(tab, st);
   if (!st) {
     $('none').hidden = false;
-    $('none').textContent = 'Open a Netflix or Disney+ watch page (reload it once after installing the extension), start the video with subtitles on, then open this again.';
+    const onSite = /:\/\/[^/]*(netflix\.com|disneyplus\.com)\//.test(tab.url || '');
+    $('none').textContent = onSite
+      ? 'This page was opened before the extension was installed or reloaded, so the extension can\'t read it yet. Reload the page, start the video with subtitles on, then open this again.'
+      : 'Open a Netflix or Disney+ watch page, start the video with subtitles on, then open this again.';
+    if (onSite) {
+      const b = document.createElement('button');
+      b.textContent = 'Reload this page';
+      b.onclick = () => { chrome.tabs.reload(tab.id); window.close(); };
+      $('none').appendChild(document.createElement('br'));
+      $('none').appendChild(b);
+    }
     return;
   }
   if (!st.videoId) {
