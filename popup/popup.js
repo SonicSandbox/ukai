@@ -135,7 +135,9 @@ async function initYoutube() {
       const { token } = await chrome.storage.local.get('token');
       const r = await D.postYoutube(token, urls, fetch);
       const words = {
-        ok: ['Sent to Surasura (' + r.queued + ' queued).', 'ok'],
+        ok: ['Sent to Surasura. It reads the ' + (urls[0].includes('/playlist') ? 'playlist' : 'video') +
+          ' in the background; the videos arrive in New arrivals when it is done (a playlist can take a few minutes). ' +
+          'Press once: a second press starts it again.', 'ok'],
         refused: ['Surasura says: ' + r.why, 'bad'],
         offline: ['Surasura is not running.', 'bad'],
         busy: ['Surasura is busy. Try again in a moment.', 'bad'],
