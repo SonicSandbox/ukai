@@ -139,6 +139,27 @@ test('season walk: an episode whose player data comes late is waited for; never 
   assert.deepStrictEqual(w.posts[2], { video_id: '103', show: 'S', season: 1, episode: 3, title: 'E3' }, 'never: the season list');
 });
 
+test('season walk: a page stuck spinning is reloaded and the episode still sent; a missing language is not reloaded', async () => {
+  const w = world();
+  let stuck = true; // 102's first load never gets a player session
+  w.env.playerReady = async () => !(w.url === '102' && stuck);
+  const nav = w.env.navigate;
+  w.env.navigate = async (u) => { if (u.endsWith('/102') && w.navs.filter((x) => x.endsWith('/102')).length >= 1) stuck = false; return nav(u); };
+  const r = await S.walkSeason({ episodes: eps, language: 'ja', startId: '101' }, w.env);
+  assert.strictEqual(r.results.filter((x) => x.ok).length, 3);
+  assert.strictEqual(w.navs.filter((x) => x.endsWith('/102')).length, 2, 'loaded, then reloaded once');
+
+  const w2 = world({ noTrack: ['102'] });
+  await S.walkSeason({ episodes: eps, language: 'ja', startId: '101' }, w2.env);
+  assert.strictEqual(w2.navs.filter((x) => x.endsWith('/102')).length, 1, 'English only: no reload');
+
+  const w3 = world();
+  w3.env.playerReady = async () => w3.url !== '103';
+  const r3 = await S.walkSeason({ episodes: eps, language: 'ja', startId: '101' }, w3.env);
+  assert.match(r3.results[2].why, /player did not start \(after 2 reloads\)/);
+  assert.strictEqual(w3.navs.filter((x) => x.endsWith('/103')).length, 3);
+});
+
 test('season walk: waits for the player session; a throwing play() does not kill the walk', async () => {
   const w = world();
   w.env.play = async () => { throw new Error('netflix: no player session'); };
