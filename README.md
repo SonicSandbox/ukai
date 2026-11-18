@@ -171,6 +171,11 @@ control), `offscreen/` (recorder), `popup/`, `options/`.
 
 </details>
 
+## 🙏 Credits
+
+Ukai was created by [Mattias](https://github.com/mattias) as *surasura-browser-extension*; his fork lives on at
+[mattias/ukai](https://github.com/mattias/ukai). It is now part of Surasura's family of tools, Houseki.
+
 ## 📜 Licence and scope
 
 GPL-3.0-or-later; see [LICENSE](LICENSE).
