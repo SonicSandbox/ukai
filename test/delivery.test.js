@@ -70,3 +70,22 @@ test('buildPayload: film has no show, season/episode optional, query stripped', 
   const q = D.buildPayload(st, { language: 'ja' }, [], { title: 'T', show: 'S', season: '', episode: '4' });
   assert.deepStrictEqual(q.show, { title: 'S', episode: 4 });
 });
+
+test('v2 posts: a busy (503) Surasura is tried again before giving up; a missing job is not retried', async () => {
+  const sleeps = [];
+  const sleep = async (ms) => { sleeps.push(ms); };
+  let n = 0;
+  const busyTwice = async () => ({ status: ++n <= 2 ? 503 : 200 });
+  assert.strictEqual(await D.postDone('t', 7, [], busyTwice, sleep), true);
+  assert.deepStrictEqual(sleeps, [2000, 5000]);
+  n = 0; sleeps.length = 0;
+  assert.strictEqual(await D.postClip('t', 7, 0, new Blob(['x']), 1, 2, busyTwice, sleep), 'ok');
+  let calls = 0;
+  const always503 = async () => { calls++; return { status: 503 }; };
+  assert.strictEqual(await D.postDone('t', 7, [], always503, sleep), false);
+  assert.strictEqual(calls, 4);
+  calls = 0;
+  assert.strictEqual(await D.postClip('t', 7, 0, new Blob(['x']), 1, 2, async () => { calls++; return { status: 404 }; }, sleep), 'gone');
+  assert.strictEqual(calls, 1);
+  assert.strictEqual(await D.postClip('t', 7, 0, new Blob(['x']), 1, 2, async () => { throw new Error('down'); }, sleep), 'abort');
+});
