@@ -15,6 +15,15 @@ test('TTML: ticks, clock, offset-time, dur, ruby and markup', () => {
   ]);
 });
 
+test('TTML2/IMSC ruby (Netflix): the reading goes, by style or on the span, its base stays', () => {
+  const r = P.parseTTML(fx('ruby-imsc.ttml'));
+  assert.deepStrictEqual(r.cues, [
+    [10, 12, '黒沼さん おはよう'],
+    [13, 15, '駅前で待ってて'],
+    [16, 18, '（友達）今日は早いね'],
+  ]);
+});
+
 test('VTT: short/long timestamps, tags, entities, multi-line, notes, empty cues', () => {
   const r = P.parseVTT(fx('sample.vtt'));
   assert.deepStrictEqual(r.cues, [
