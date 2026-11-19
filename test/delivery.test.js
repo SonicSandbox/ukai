@@ -78,12 +78,13 @@ test('v2 posts: a busy (503) Surasura is tried again before giving up; a missing
   const busyTwice = async () => ({ status: ++n <= 2 ? 503 : 200 });
   assert.strictEqual(await D.postDone('t', 7, [], busyTwice, sleep), true);
   assert.deepStrictEqual(sleeps, [2000, 5000]);
+  assert.ok(D.WAITS.reduce((a, b) => a + b, 0) >= 150000, 'patient for at least 2 1/2 minutes');
   n = 0; sleeps.length = 0;
   assert.strictEqual(await D.postClip('t', 7, 0, new Blob(['x']), 1, 2, busyTwice, sleep), 'ok');
   let calls = 0;
   const always503 = async () => { calls++; return { status: 503 }; };
   assert.strictEqual(await D.postDone('t', 7, [], always503, sleep), false);
-  assert.strictEqual(calls, 4);
+  assert.strictEqual(calls, D.WAITS.length + 1);
   calls = 0;
   assert.strictEqual(await D.postClip('t', 7, 0, new Blob(['x']), 1, 2, async () => { calls++; return { status: 404 }; }, sleep), 'gone');
   assert.strictEqual(calls, 1);
