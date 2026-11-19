@@ -105,28 +105,45 @@
     }
   }
 
-  // -> 'ok' | 'gone' (404: skip) | 'toolarge' | 'abort' (Surasura not answering / wrong token / busy)
-  async function postClip(token, job, n, blob, start, end, fetchFn) {
+  // Surasura answers 503 while it is busy (e.g. making cards from the clips it just got) and a connection can drop for a
+  // moment: try again a few times before calling it "not answering". -> the last Response, or throws the last error.
+  const WAITS = [2000, 5000, 10000];
+  const realSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function fetchRetry(fetchFn, url, opts, sleep) {
+    for (let i = 0; ; i++) {
+      let r = null, err = null;
+      try { r = await fetchFn(url, opts); } catch (e) { err = e; }
+      if (r && r.status !== 503) return r;
+      console.log('[surasura] ' + url.split('/v1/')[1] + ' ->', r ? r.status + ' (busy)' : 'no answer: ' + err, i < WAITS.length ? '; trying again' : '; giving up');
+      if (i >= WAITS.length) { if (r) return r; throw err; }
+      await (sleep || realSleep)(WAITS[i]);
+    }
+  }
+
+  // -> 'ok' | 'gone' (404: skip) | 'toolarge' | 'abort' (Surasura still busy / not answering after retries, wrong token)
+  async function postClip(token, job, n, blob, start, end, fetchFn, sleep) {
     try {
-      const r = await fetchFn(BASE + '/v1/jobs/' + job + '/clips/' + n, {
+      const r = await fetchRetry(fetchFn, BASE + '/v1/jobs/' + job + '/clips/' + n, {
         method: 'POST',
         headers: hdr(token, { 'Content-Type': 'video/webm', 'X-Clip-Start': String(start), 'X-Clip-End': String(end) }),
         body: blob,
-      });
+      }, sleep);
       if (r.status === 200) return 'ok';
       if (r.status === 404) return 'gone';
       if (r.status === 413) return 'toolarge';
+      console.log('[surasura] clip ' + n + ' of job ' + job + ': HTTP ' + r.status);
       return 'abort';
     } catch (e) {
       return 'abort';
     }
   }
 
-  async function postDone(token, job, failed, fetchFn) {
+  async function postDone(token, job, failed, fetchFn, sleep) {
     try {
-      const r = await fetchFn(BASE + '/v1/jobs/' + job + '/done', {
+      const r = await fetchRetry(fetchFn, BASE + '/v1/jobs/' + job + '/done', {
         method: 'POST', headers: hdr(token, { 'Content-Type': 'application/json' }), body: JSON.stringify({ failed }),
-      });
+      }, sleep);
+      if (r.status !== 200) console.log('[surasura] done of job ' + job + ': HTTP ' + r.status);
       return r.status === 200;
     } catch (e) {
       return false;

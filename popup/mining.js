@@ -142,7 +142,7 @@ async function initMining(tab, st) {
     const base = `${done} clip(s) recorded, ${failed} line(s) failed.`;
     if (r.status === 'done') return 'Finished. ' + base;
     if (r.status === 'stopped') return 'Stopped. ' + base;
-    if (r.status === 'aborted') return 'Surasura stopped answering, so the batch was stopped. ' + base;
+    if (r.status === 'aborted') return 'Surasura did not answer (busy or closed) after several tries, so the batch was stopped. What it had got is kept; press Record now again to go on. ' + base;
     if (r.status === 'needs-click') return r.message + ' ' + base;
     return 'Stopped by an error: ' + (r.message || '') + ' ' + base;
   }
