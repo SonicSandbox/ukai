@@ -21,7 +21,23 @@
     return (hosts || []).some((x) => h === x || h.endsWith('.' + x));
   }
 
-  const api = { siteHosts, isSiteUrl };
+  // A page where a Netflix / Disney+ player lives (they allow one playing video at a time per account).
+  function isWatchUrl(url) {
+    let u;
+    try { u = new URL(String(url)); } catch (e) { return false; }
+    const h = u.hostname.toLowerCase();
+    if (h === 'netflix.com' || h.endsWith('.netflix.com')) return /^\/(?:[a-z-]+\/)?watch\/\d+/i.test(u.pathname);
+    if (h === 'disneyplus.com' || h.endsWith('.disneyplus.com')) return /^\/(?:[a-z-]+\/)?(?:play|video)\//i.test(u.pathname);
+    return false;
+  }
+
+  // the tabs (anything with a url) that are playing-page candidates, except the ones in `ownTabIds`
+  function watchTabs(tabs, ownTabIds) {
+    const own = new Set(ownTabIds || []);
+    return (tabs || []).filter((t) => t && !own.has(t.id) && isWatchUrl(t.url));
+  }
+
+  const api = { siteHosts, isSiteUrl, isWatchUrl, watchTabs };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SurasuraHosts = api;
 })(typeof self !== 'undefined' ? self : globalThis);

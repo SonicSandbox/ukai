@@ -34,7 +34,23 @@ function loadComplete(tabId, timeoutMs) {
   });
 }
 
-const OWN = new Set(['content', 'startSeason', 'send', 'status', 'startBatch', 'page', 'navigate', 'closeTab']);
+const MINIMIZE = true; // Ukai's window stays minimized while it records (frames keep arriving: the clip checks say if not)
+
+// Best effort: pause the video of a just-opened own window as soon as its player answers (Netflix autoplays).
+async function quietUntilReady(tabId) {
+  for (let i = 0; i < 40; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    try {
+      const s = await chrome.tabs.sendMessage(tabId, { type: 'player', op: 'state' });
+      if (s && s.result && s.result.ok && s.result.apiReady) {
+        await chrome.tabs.sendMessage(tabId, { type: 'player', op: 'pause' });
+        return;
+      }
+    } catch (e) { /* the page is still loading */ }
+  }
+}
+
+const OWN = new Set(['openOwn', 'ownReady', 'closeWindow', 'content', 'startSeason', 'send', 'status', 'startBatch', 'page', 'navigate', 'closeTab']);
 
 chrome.runtime.onMessage.addListener((m, _s, reply) => {
   if (!m || (m.to && m.to !== 'background') || !OWN.has(m.type)) return false; // not for us: let others answer
@@ -72,6 +88,25 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
         if (!H.isSiteUrl(m.url, H.siteHosts(chrome.runtime.getManifest()))) return { error: 'not an allowed site address' };
         await chrome.tabs.update(m.tabId, { url: m.url });
         await loadComplete(m.tabId, 60000);
+        return { ok: true };
+      }
+      case 'openOwn': { // Ukai's own window for a job's episode (never the learner's tab)
+        if (!H.isSiteUrl(m.url, H.siteHosts(chrome.runtime.getManifest()))) return { error: 'not an allowed site address' };
+        const win = await chrome.windows.create({ url: m.url, type: 'normal', width: 1100, height: 700, focused: true });
+        const tab = win.tabs[0];
+        await chrome.tabs.update(tab.id, { muted: true }); // nothing is heard before the capture takes over
+        const { own } = await chrome.storage.session.get('own');
+        await chrome.storage.session.set({ own: Object.assign({}, own, { [tab.id]: win.id }) });
+        quietUntilReady(tab.id); // not awaited
+        return { ok: true, tabId: tab.id, windowId: win.id };
+      }
+      case 'ownReady': {
+        await chrome.tabs.update(m.tabId, { muted: false }).catch(() => {});
+        if (MINIMIZE) await chrome.windows.update(m.windowId, { state: 'minimized' }).catch(() => {});
+        return { ok: true };
+      }
+      case 'closeWindow': {
+        try { await chrome.windows.remove(m.windowId); } catch (e) { /* already closed */ }
         return { ok: true };
       }
       case 'closeTab': {

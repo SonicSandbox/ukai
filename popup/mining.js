@@ -13,6 +13,10 @@ async function initMining(tab, st) {
   const hide = () => { shown = 'hidden'; box.hidden = true; };
   const el = (tag, text, props) => Object.assign(document.createElement(tag), { textContent: text || '' }, props || {});
 
+  // the tabs Ukai opened itself (background keeps this in session storage)
+  const ownIds = Object.keys((await chrome.storage.session.get('own').catch(() => ({}))).own || {}).map(Number);
+  const isOwn = !!tab && ownIds.includes(tab.id);
+
   const offStatus = () => chrome.runtime.sendMessage({ to: 'offscreen', type: 'status' }).catch(() => null);
 
   // -> the ms until the next look (it keeps looking while the popup is open: nothing needs opening again)
@@ -50,19 +54,18 @@ async function initMining(tab, st) {
     const lines = j.jobs.reduce((n, x) => n + x.lines.length, 0);
     parts.push(el('h3', 'Mining'));
     parts.push(el('p', `${j.jobs.length} episode(s) wait: ${lines} lines.`));
-    const here = st && j.jobs.find((x) => x.site === st.site && x.video_id === st.videoId);
+    const here = isOwn && st && j.jobs.find((x) => x.site === st.site && x.video_id === st.videoId);
     if (here) {
       const others = j.jobs.filter((x) => x !== here);
       const cb = el('input', '', { type: 'checkbox', id: 'cont', checked: true });
       if (others.length) {
-        const lab = el('label', ` also continue with the other ${others.length} episode(s) in this tab`);
+        const lab = el('label', ` also continue with the other ${others.length} episode(s) in this window`);
         lab.prepend(cb);
         parts.push(lab);
       }
       const b = el('button', `Record ${here.lines.length} clips for "${here.title}"`);
       b.onclick = async () => {
         b.disabled = true;
-        const { opened } = await chrome.storage.session.get('opened').catch(() => ({}));
         const order = [here].concat(others.length && cb.checked ? others : []);
         let streamId;
         try {
@@ -72,7 +75,7 @@ async function initMining(tab, st) {
         }
         const r = await chrome.runtime.sendMessage({
           type: 'startBatch', tabId: tab.id, streamId, token, jobs: order,
-          openedTab: !!(opened && opened[tab.id]),
+          windowId: tab.windowId, // Ukai's own window: it is minimized while recording and closed afterwards
         });
         if (!r || !r.ok) return say([el('p', 'Could not start: ' + ((r && r.why) || 'no answer'), { className: 'bad' })]);
         shown = null;
@@ -81,23 +84,24 @@ async function initMining(tab, st) {
       parts.push(b);
     } else {
       const j0 = j.jobs[0];
-      parts.push(el('p', `Next: "${j0.title}" (${j0.lines.length} lines). Open it, then click the extension icon on that tab.`, { className: 'muted' }));
-      const b = el('button', 'Open this episode');
+      parts.push(el('p', 'Ukai records in a small window of its own, muted and minimized. Netflix and Disney+ allow only one playing video, ' +
+        'so leave any video you have open first. You press the Ukai icon once in that window.', { className: 'muted' }));
+      const b = el('button', 'Record now');
       b.onclick = async () => {
+        const H = self.SurasuraHosts;
         // a job's address comes from Surasura: only ever open it on one of this extension's own sites
-        if (!self.SurasuraHosts.isSiteUrl(j0.url, self.SurasuraHosts.siteHosts(chrome.runtime.getManifest()))) {
+        if (!H.isSiteUrl(j0.url, H.siteHosts(chrome.runtime.getManifest()))) {
           return say([el('p', 'Surasura sent an address that is not one of the sites Ukai works on, so it was not opened.', { className: 'bad' })]);
         }
-        const found = await chrome.tabs.query({ url: ['*://*.netflix.com/*', '*://*.disneyplus.com/*'] });
-        let t = found.find((x) => x.url.includes(j0.video_id));
-        let created = false;
-        if (!t) { t = await chrome.tabs.create({ url: j0.url, active: true }); created = true; }
-        else await chrome.tabs.update(t.id, { active: true });
-        if (created) {
-          const { opened } = await chrome.storage.session.get('opened').catch(() => ({}));
-          await chrome.storage.session.set({ opened: Object.assign({}, opened, { [t.id]: true }) });
+        const open = H.watchTabs(await chrome.tabs.query({ url: ['*://*.netflix.com/*', '*://*.disneyplus.com/*'] }), ownIds);
+        if (open.length) {
+          return say([el('h3', 'Mining'), el('p', 'You have a video open (' + open.length + ' tab' + (open.length > 1 ? 's' : '') +
+            '). Netflix lets only one play, so leave it first: go back from the player to the browse page, then press Record now again. ' +
+            'Ukai never touches your own tab.', { className: 'bad' }), b]);
         }
-        window.close();
+        const r = await chrome.runtime.sendMessage({ type: 'openOwn', url: j0.url });
+        if (!r || r.error) return say([el('p', 'Could not open the window: ' + ((r && r.error) || 'no answer'), { className: 'bad' })]);
+        say([el('h3', 'Mining'), el('p', 'Ukai opened its own window. Click the Ukai icon there to start (one press).', { className: 'ok' })]);
       };
       parts.push(b);
     }
@@ -115,7 +119,7 @@ async function initMining(tab, st) {
     const stop = el('button', 'Stop');
     stop.onclick = () => { chrome.runtime.sendMessage({ to: 'offscreen', type: 'stop' }); stop.disabled = true; };
     say([el('h3', season ? 'Season walk' : 'Mining'), line,
-      el('p', 'Keep this tab open' + (season ? '' : ' and the video visible') + '. You can close this popup.', { className: 'muted' }), stop],
+      el('p', season ? 'Keep this tab open. You can close this popup.' : 'Ukai\'s own window works by itself (it stays minimized). Don\'t close it and don\'t start a video on Netflix meanwhile. You can close this popup.', { className: 'muted' }), stop],
     'running');
   }
 

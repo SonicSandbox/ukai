@@ -125,34 +125,6 @@ test('second episode: navigates; if the capture died, stop and ask for a click w
   const r2 = await W.runBatch(jobs, w2.env);
   assert.strictEqual(r2.status, 'done');
   assert.strictEqual(w2.done.length, 2);
-  assert.strictEqual(w2.url, 'https://x/watch/V1', 'back on the episode the batch began on');
-});
-
-test('afterwards: back to the episode and moment the learner was at, paused', async () => {
-  const w = world();
-  w.url = 'https://x/watch/V0?trackId=9';
-  w.t = 1234.5;
-  const jobs = [job(1, [[0, 10, 12]]), job(2, [[0, 20, 22]], { video_id: 'V2', url: 'https://x/watch/V2' })];
-  const r = await W.runBatch(jobs, w.env);
-  assert.strictEqual(r.status, 'done');
-  assert.strictEqual(r.back, true);
-  assert.strictEqual(w.url, 'https://x/watch/V0?trackId=9');
-  assert.ok(Math.abs(w.t - 1234.5) < 0.01, 'at its time: ' + w.t);
-  assert.strictEqual(w.playing, false);
-});
-
-test('Stop goes back too; a click still needed does not move the tab', async () => {
-  const w = world({ stopAfter: 1 });
-  w.url = 'https://x/watch/V1';
-  w.t = 50;
-  const r = await W.runBatch([job(1, [[0, 10, 12], [1, 20, 22]])], w.env);
-  assert.strictEqual(r.status, 'stopped');
-  assert.ok(Math.abs(w.t - 50) < 0.01, 'same episode: only the time is put back: ' + w.t);
-  const w2 = world({ alive: false });
-  w2.url = 'https://x/watch/V0';
-  const r2 = await W.runBatch([job(2, [[0, 10, 12]], { video_id: 'V2', url: 'https://x/watch/V2' })], w2.env);
-  assert.strictEqual(r2.status, 'needs-click');
-  assert.strictEqual(w2.url, 'https://x/watch/V2');
 });
 
 test('black picture / silence are failures with advice; UI is hidden while recording and restored', async () => {

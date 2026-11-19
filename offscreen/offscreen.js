@@ -18,13 +18,16 @@ async function startBatch(m) {
       audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: m.streamId } },
       video: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: m.streamId, maxWidth: 1280, maxHeight: 720, maxFrameRate: 30 } },
     });
-    // tabCapture mutes the tab for the user; play the sound back so nothing is muted.
+    // Silent by design: tabCapture takes the tab's sound away from the speakers and nothing plays it back.
     ctx = new AudioContext();
-    ctx.createMediaStreamSource(stream).connect(ctx.destination);
 
     // quality: was anything but silence / a black picture recorded during this clip?
     const an = ctx.createAnalyser();
+    const sink = ctx.createGain(); // gain 0: keeps the analyser running without a sound
+    sink.gain.value = 0;
     ctx.createMediaStreamSource(stream).connect(an);
+    an.connect(sink);
+    sink.connect(ctx.destination);
     const abuf = new Float32Array(an.fftSize);
     let peak = 0, sampler = null;
     const vid = document.createElement('video');
@@ -66,6 +69,8 @@ async function startBatch(m) {
         });
       },
     };
+    // the capture is live: un-mute the window's tab (the capture keeps its sound from the speakers) and minimize it
+    if (m.windowId) await relay({ type: 'ownReady', tabId: m.tabId, windowId: m.windowId });
     const page = async (op, args) => {
       const r = await relay({ type: 'page', tabId: m.tabId, op, args });
       if (!r || r.error) throw new Error((r && r.error) || 'no answer from the page');
@@ -98,7 +103,7 @@ async function startBatch(m) {
   } finally {
     if (stream) stream.getTracks().forEach((t) => t.stop());
     if (ctx) ctx.close();
-    if (m.openedTab) relay({ type: 'closeTab', tabId: m.tabId });
+    if (m.windowId) relay({ type: 'closeWindow', windowId: m.windowId });
   }
 }
 
