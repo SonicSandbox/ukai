@@ -23,7 +23,7 @@
       const v = video();
       return {
         ok: !!v, t: v ? v.currentTime : 0, paused: v ? v.paused : true, seeking: v ? v.seeking : false,
-        readyState: v ? v.readyState : 0, apiReady: site.ready ? !!site.ready() : true, url: location.href, blocker: site.blocker ? site.blocker() : null,
+        readyState: v ? v.readyState : 0, apiReady: site.ready ? !!site.ready() : true, url: location.href, visibility: document.visibilityState, blocker: site.blocker ? site.blocker() : null,
       };
     },
   };

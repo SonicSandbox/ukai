@@ -34,7 +34,9 @@ function loadComplete(tabId, timeoutMs) {
   });
 }
 
-const MINIMIZE = true; // Ukai's window stays minimized while it records (frames keep arriving: the clip checks say if not)
+// Minimizing Ukai's window can make Netflix's page 'hidden' so it neither seeks nor plays: off by default, the window
+// is shrunk to a small one instead. Set to true to try minimizing again.
+const MINIMIZE = false;
 
 // Best effort: pause the video of a just-opened own window as soon as its player answers (Netflix autoplays).
 async function quietUntilReady(tabId) {
@@ -103,6 +105,7 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
       case 'ownReady': {
         await chrome.tabs.update(m.tabId, { muted: false }).catch(() => {});
         if (MINIMIZE) await chrome.windows.update(m.windowId, { state: 'minimized' }).catch(() => {});
+        else await chrome.windows.update(m.windowId, { width: 480, height: 320 }).catch(() => {});
         return { ok: true };
       }
       case 'closeWindow': {
