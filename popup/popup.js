@@ -105,7 +105,9 @@ async function send() {
     const r = await chrome.runtime.sendMessage({ type: 'send', payload });
     if (r.status === 'rejected') say('Surasura did not accept it: ' + r.why, 'bad');
     else if (r.status === 'error') say('Something went wrong: ' + r.why, 'bad');
-    else {
+    else if (r.queueFull) {
+      say('Surasura did not answer and the waiting list here is full, so this subtitle was NOT kept. Start Surasura and send it again.', 'bad');
+    } else {
       const [text, cls] = WORDS[r.status];
       say(`${text}\n(${payload.title}, ${payload.language}, ${cues.length} cues)` + (payload.cover ? '\nCover sent.' : '\nNo cover: ' + ((cv && cv.why) || 'unknown')), cls);
     }
