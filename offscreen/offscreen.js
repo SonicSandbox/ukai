@@ -80,7 +80,7 @@ async function startBatch(m) {
       now: () => Date.now(),
       sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
       shouldStop: () => stopFlag,
-      onProgress: (p) => { status = { state: 'running', progress: p }; },
+      onProgress: (p) => { status = { state: 'running', progress: p }; log('progress', JSON.stringify(p)); },
       navigate: (url) => relay({ type: 'navigate', tabId: m.tabId, url }),
       streamAlive: () => stream.getVideoTracks().some((t) => t.readyState === 'live'),
       player: {
