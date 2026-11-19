@@ -139,7 +139,11 @@ async function initMining(tab, st) {
     }
     const done = (r.results || []).reduce((n, x) => n + x.recorded, 0);
     const failed = (r.results || []).reduce((n, x) => n + x.failed.length, 0);
-    const base = `${done} clip(s) recorded, ${failed} line(s) failed.`;
+    // say why, by reason (the same words go to Surasura in `done`)
+    const why = {};
+    for (const x of r.results || []) for (const f of x.failed) why[f.why] = (why[f.why] || 0) + 1;
+    const reasons = Object.entries(why).map(([w, n]) => `${n} × ${w}`).join('; ');
+    const base = `${done} clip(s) recorded, ${failed} line(s) failed` + (reasons ? ` (${reasons}).` : '.');
     if (r.status === 'done') return 'Finished. ' + base;
     if (r.status === 'stopped') return 'Stopped. ' + base;
     if (r.status === 'aborted') return 'Surasura did not answer (busy or closed) after several tries, so the batch was stopped. What it had got is kept; press Record now again to go on. ' + base;
