@@ -107,7 +107,8 @@
 
   // Surasura answers 503 while it is busy (e.g. making cards from the clips it just got) and a connection can drop for a
   // moment: try again a few times before calling it "not answering". -> the last Response, or throws the last error.
-  const WAITS = [2000, 5000, 10000];
+  // about 3 1/2 minutes in all: making cards from a finished episode can keep Surasura busy for a while
+  const WAITS = [2000, 5000, 10000, 15000, 20000, 30000, 30000, 30000, 30000, 30000];
   const realSleep = (ms) => new Promise((r) => setTimeout(r, ms));
   async function fetchRetry(fetchFn, url, opts, sleep) {
     for (let i = 0; ; i++) {
@@ -165,7 +166,7 @@
     return { status: 'rejected', why: (j && j.why) || 'HTTP ' + r.status };
   }
 
-  const api = { BASE, hello, post, deliver, flush, keyOf, buildPayload, getJobs, postClip, postDone, postYoutube };
+  const api = { WAITS, BASE, hello, post, deliver, flush, keyOf, buildPayload, getJobs, postClip, postDone, postYoutube };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SurasuraDelivery = api;
 })(typeof self !== 'undefined' ? self : globalThis);
