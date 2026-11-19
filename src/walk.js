@@ -24,7 +24,8 @@
     }
   }
 
-  const blockerNote = (s) => (s && s.blocker ? ` (${s.blocker})` : '');
+  const blockerNote = (s) => (s && s.blocker ? ` (${s.blocker})` : '') +
+    (s && s.visibility ? ` [t=${Number(s.t).toFixed(1)}, readyState=${s.readyState}, page ${s.visibility}]` : '');
 
   async function recordLine(job, line, env) {
     // everything but the video is hidden from before the seek until the clip is done (also on failure / Stop)
