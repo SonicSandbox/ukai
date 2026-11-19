@@ -119,7 +119,7 @@ async function initMining(tab, st) {
     const stop = el('button', 'Stop');
     stop.onclick = () => { chrome.runtime.sendMessage({ to: 'offscreen', type: 'stop' }); stop.disabled = true; };
     say([el('h3', season ? 'Season walk' : 'Mining'), line,
-      el('p', season ? 'Keep this tab open. You can close this popup.' : 'Ukai\'s own window works by itself (it stays minimized). Don\'t close it and don\'t start a video on Netflix meanwhile. You can close this popup.', { className: 'muted' }), stop],
+      el('p', season ? 'Ukai\'s own window works by itself. Don\'t close it and don\'t start a video on Netflix meanwhile. You can close this popup.' : 'Ukai\'s own window works by itself (it stays minimized). Don\'t close it and don\'t start a video on Netflix meanwhile. You can close this popup.', { className: 'muted' }), stop],
     'running');
   }
 

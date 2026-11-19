@@ -93,11 +93,16 @@ popup then shows "N episodes wait: M lines". What you do:
 
 ### Send the whole season *(experimental, Netflix)*
 
-Netflix only delivers an episode's subtitle file when that episode's page plays. So this walks the same tab through each
-episode of the season (muted, about 20–30 seconds each, roughly 10 minutes for 24 episodes), lets the player load the
-subtitles in the language you chose, posts each one, then returns to your episode. Switch subtitles on once for the
-show so Netflix remembers the language. Progress and Stop are in the popup; an episode without that language is
-reported and skipped. Not yet tried against a live account.
+Netflix only delivers an episode's subtitle file when that episode's page plays. So the walk plays each episode of the
+season in **a window of Ukai's own**, muted, about 20–30 seconds each (roughly 10 minutes for 24 episodes), lets the
+player load the subtitles in the language you chose, and posts each one. It never uses or moves your own tab.
+
+1. In an episode, press **Plan the whole season**. (Switch subtitles on once for the show so Netflix remembers the language.)
+2. Leave the video (back to the browse page): Netflix plays one video at a time.
+3. Open Ukai and press **Start the season walk**. Ukai's window opens, walks the episodes and closes. Progress and Stop are
+   in the popup; an episode without that language is reported and skipped.
+
+Not yet tried against a live account.
 
 ### YouTube
 

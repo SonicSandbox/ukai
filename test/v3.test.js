@@ -167,3 +167,12 @@ test('season walk: waits for the player session; a throwing play() does not kill
   assert.strictEqual(r.status, 'done');
   assert.strictEqual(r.results.filter((x) => x.ok).length, 3);
 });
+
+test('season walk in Ukai\'s own window: without a startId it does not navigate back, and ends muted off', async () => {
+  const w = world({ startId: '101' });
+  const r = await S.walkSeason({ episodes: eps, language: 'ja' }, w.env);
+  assert.strictEqual(r.status, 'done');
+  assert.strictEqual(w.url, '103'); // stays on the last episode: the window is closed by the caller
+  assert.strictEqual(w.muted[w.muted.length - 1], false);
+  assert.strictEqual(w.navs.filter((u) => u.endsWith('/101')).length, 0);
+});
