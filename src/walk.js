@@ -138,7 +138,31 @@
     }
     if (!env.streamAlive()) return { ok: false, fatal: true, why: 'the capture ended when the tab changed page' };
     await P.pause();
-    return { ok: true };
+    const at = await P.state().catch(() => null);
+    return { ok: true, was: at && at.ok && typeof at.t === 'number' ? { t: at.t } : null };
+  }
+
+  // Put the episode back where it was when Ukai's window opened it (the learner's point, which Netflix resumed at), so
+  // *Continue watching* is not left at the last recorded line: seek, play a moment so the site saves it, pause.
+  // Best effort: never throws, and a Stop does not skip it.
+  async function goBack(env, was) {
+    if (!was) return false;
+    const P = env.player;
+    const env2 = Object.assign({}, env, { shouldStop: () => false });
+    try {
+      await P.pause();
+      await P.seek(was.t);
+      await waitFor(env2, async () => {
+        const x = await P.state().catch(() => ({ ok: false }));
+        return x.ok && !x.seeking && Math.abs(x.t - was.t) <= 3 && x;
+      }, 15000);
+      await P.play();
+      await env.sleep(2000);
+      await P.pause();
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   // jobs in the order to walk, in Ukai's own window. -> {status, results:[{job, status, recorded, failed}], message?}
@@ -163,13 +187,14 @@
         continue;
       }
       const r = await walkJob(job, env, prog);
+      await goBack(env, o.was);
       results.push({ job: job.job, status: r.status, recorded: r.recorded, failed: r.failed });
       if (r.status !== 'done') return { status: r.status, results };
     }
     return { status: 'done', results };
   }
 
-  const api = { walkJob, openJob, runBatch, STOP, ABORT };
+  const api = { walkJob, openJob, runBatch, goBack, STOP, ABORT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SurasuraWalk = api;
 })(typeof self !== 'undefined' ? self : globalThis);

@@ -85,6 +85,8 @@ popup then shows "N episodes wait: M lines". What you do:
   also on failure or Stop.
 - **Silent:** the captured sound is not played back (Chrome takes a captured tab's sound from the speakers), and the
   window is muted until the capture is live.
+- **Put back where it began:** after each episode Ukai seeks back to the point the episode opened at (Netflix resumes at
+  yours), plays a moment so the site saves it, and pauses, so *Continue watching* is not left at the last recorded line.
 - Ukai's own window is closed afterwards.
 - Only what plays in Ukai's own window is recorded; the stream itself is never downloaded or saved, and clips go only to
   `127.0.0.1:27631`.
