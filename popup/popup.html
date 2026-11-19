@@ -4,7 +4,9 @@
 <link rel="stylesheet" href="../ui/ukai.css">
 <style>
   body{width:360px}
+  /* probe:start */
   #probeOut img,#probeOut audio{width:100%;margin-top:4px}
+  /* probe:end */
 </style>
 <div class="brand"><img src="../icons/icon-32.png" alt=""><b>Ukai</b><i>鵜飼</i><span>to Surasura</span></div>
 <div class="page">
@@ -26,6 +28,7 @@
   <div id="queue" class="muted"></div>
   <a href="#" id="opts">Token / settings</a>
 </div>
+<!-- probe:start -->
 <hr>
 <details>
   <summary>Capture probe (try by hand)</summary>
@@ -33,9 +36,13 @@
   <button id="probe">Run capture probe</button>
   <div id="probeOut"></div>
 </details>
+<!-- probe:end -->
 </div>
 <script src="../src/delivery.js"></script>
 <script src="../src/youtube.js"></script>
+<script src="../src/hosts.js"></script>
+<!-- probe:start -->
 <script src="probe.js"></script>
+<!-- probe:end -->
 <script src="mining.js"></script>
 <script src="popup.js"></script>

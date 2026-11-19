@@ -156,6 +156,7 @@ Version 0.2. Plain JavaScript, Manifest V3, no build step. The wire format betwe
 node --test test/                 # parser, delivery and hook tests (fixtures are hand-written, no real show content)
 python tools/mock_surasura.py     # mock receiver per CONTRACT.md (--token, --port, --busy)
 node tools/e2e_send.js            # simulated popup: fixture -> payload -> mock receiver
+node tools/pack.js                # the store zip, dist/ukai-<version>.zip, WITHOUT the developer capture probe
 ```
 
 **Try mining without Surasura:** `python tools/mock_surasura.py --job-url https://www.netflix.com/watch/<id>` (lines via

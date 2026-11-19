@@ -115,7 +115,9 @@ async function send() {
   $('send').disabled = false;
 }
 
+// probe:start
 $('probe').onclick = () => runProbe(tab, $('probeOut'), $('probe'));
+// probe:end
 init();
 
 async function startSeason(m) {
