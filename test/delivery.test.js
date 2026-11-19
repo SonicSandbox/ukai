@@ -2,6 +2,14 @@ const test = require('node:test');
 const assert = require('node:assert');
 const D = require('../src/delivery.js');
 
+test('postDone echoes the lines\' rev when the job had one, and sends none otherwise', async () => {
+  const sent = [];
+  const fetchFn = async (url, init) => { sent.push(JSON.parse(init.body)); return { status: 200 }; };
+  assert.strictEqual(await D.postDone('t', 7, [{ n: 1, why: 'x' }], fetchFn, 3), true);
+  await D.postDone('t', 7, [], fetchFn, undefined);
+  assert.deepStrictEqual(sent, [{ failed: [{ n: 1, why: 'x' }], rev: 3 }, { failed: [] }]);
+});
+
 function fakeFetch(script) {
   const calls = [];
   const f = async (url, opts) => {
