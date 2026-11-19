@@ -17,6 +17,8 @@ async function initMining(tab, st) {
   const ownIds = Object.keys((await chrome.storage.session.get('own').catch(() => ({}))).own || {}).map(Number);
   const isOwn = !!tab && ownIds.includes(tab.id);
 
+  let note = null; // what to do next, kept on screen (the box is drawn again every few seconds)
+
   const offStatus = () => chrome.runtime.sendMessage({ to: 'offscreen', type: 'status' }).catch(() => null);
 
   // -> the ms until the next look (it keeps looking while the popup is open: nothing needs opening again)
@@ -55,6 +57,10 @@ async function initMining(tab, st) {
     parts.push(el('h3', 'Mining'));
     parts.push(el('p', `${j.jobs.length} episode(s) wait: ${lines} lines.`));
     const here = isOwn && st && j.jobs.find((x) => x.site === st.site && x.video_id === st.videoId);
+    if (note && !isOwn) parts.push(el('p', note, { className: 'ok' }));
+    if (isOwn && !here) {
+      parts.push(el('p', `This is Ukai's own window, but no waiting episode matches this page (page: ${st ? st.site + ' ' + st.videoId : 'not readable yet'}; waiting: ${j.jobs.map((x) => x.site + ' ' + x.video_id).join(', ')}). Wait for the player to load, then open Ukai again.`, { className: 'bad' }));
+    }
     if (here) {
       const others = j.jobs.filter((x) => x !== here);
       const cb = el('input', '', { type: 'checkbox', id: 'cont', checked: true });
@@ -101,7 +107,9 @@ async function initMining(tab, st) {
         }
         const r = await chrome.runtime.sendMessage({ type: 'openOwn', url: j0.url });
         if (!r || r.error) return say([el('p', 'Could not open the window: ' + ((r && r.error) || 'no answer'), { className: 'bad' })]);
-        say([el('h3', 'Mining'), el('p', 'Ukai opened its own window. Click the Ukai icon there to start (one press).', { className: 'ok' })]);
+        note = 'Ukai opened its own window. Go to that window and click the Ukai icon THERE (one press), then press "Record N clips".';
+        shown = null;
+        render();
       };
       parts.push(b);
     }
