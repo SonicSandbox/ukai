@@ -1,5 +1,6 @@
-importScripts('delivery.js');
+importScripts('delivery.js', 'hosts.js');
 const D = self.SurasuraDelivery;
+const H = self.SurasuraHosts;
 const deps = {
   fetch: (...a) => fetch(...a),
   storage: {
@@ -67,6 +68,8 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
         }
       }
       case 'navigate': {
+        // only to this extension's own site hosts (the address may come from Surasura or a page)
+        if (!H.isSiteUrl(m.url, H.siteHosts(chrome.runtime.getManifest()))) return { error: 'not an allowed site address' };
         await chrome.tabs.update(m.tabId, { url: m.url });
         await loadComplete(m.tabId, 60000);
         return { ok: true };

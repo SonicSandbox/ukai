@@ -84,6 +84,10 @@ async function initMining(tab, st) {
       parts.push(el('p', `Next: "${j0.title}" (${j0.lines.length} lines). Open it, then click the extension icon on that tab.`, { className: 'muted' }));
       const b = el('button', 'Open this episode');
       b.onclick = async () => {
+        // a job's address comes from Surasura: only ever open it on one of this extension's own sites
+        if (!self.SurasuraHosts.isSiteUrl(j0.url, self.SurasuraHosts.siteHosts(chrome.runtime.getManifest()))) {
+          return say([el('p', 'Surasura sent an address that is not one of the sites Ukai works on, so it was not opened.', { className: 'bad' })]);
+        }
         const found = await chrome.tabs.query({ url: ['*://*.netflix.com/*', '*://*.disneyplus.com/*'] });
         let t = found.find((x) => x.url.includes(j0.video_id));
         let created = false;
