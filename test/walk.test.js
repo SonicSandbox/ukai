@@ -144,3 +144,21 @@ test('UI is hidden before the first seek, and restored even when the line fails'
   assert.strictEqual(w.hiddenBeforeSeek, true);
   assert.strictEqual(w.hidden, false);
 });
+
+test('afterwards each episode is put back where it opened (the learner\'s point), paused; also after Stop', async () => {
+  const w = world();
+  w.t = 1234.5; // Netflix resumed here
+  const jobs = [job(1, [[0, 10, 12]]), job(2, [[0, 20, 22]], { video_id: 'V2', url: 'https://x/watch/V2' })];
+  const r = await W.runBatch(jobs, w.env);
+  assert.strictEqual(r.status, 'done');
+  // job 2 opened at t=0 (a fresh page): its last position is back near 0, job 1's was put back near 1234.5 before that
+  assert.ok(w.t < 5, 'the second episode is back at its start: ' + w.t);
+  assert.strictEqual(w.playing, false);
+
+  const w2 = world({ stopAfter: 1 });
+  w2.t = 500;
+  const r2 = await W.runBatch([job(1, [[0, 10, 12], [1, 20, 22]])], w2.env);
+  assert.strictEqual(r2.status, 'stopped');
+  assert.ok(Math.abs(w2.t - 500) < 4, 'back at 500 after Stop: ' + w2.t);
+  assert.strictEqual(w2.playing, false);
+});
