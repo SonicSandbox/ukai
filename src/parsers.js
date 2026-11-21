@@ -40,6 +40,39 @@
     return joinLines(decodeEntities(stripMarkup(markup)).split(/\r?\n/));
   }
 
+  // TTML2 / IMSC 1.1 ruby (Netflix's Japanese): the reading is a <span> whose tts:ruby is "text" (or the
+  // "textContainer" holding it), set on the span itself or through a <style> it names. The base stays and the
+  // reading goes, so a line reads 黒沼さん, never 黒沼くろぬまさん.
+  const RUBY_TEXT = /^(?:text|textContainer)$/;
+
+  function rubyStyles(xml) {
+    const ids = new Set();
+    const re = /<style\b([^>]*?)\/?>/g;
+    let m;
+    while ((m = re.exec(xml))) {
+      const id = attr(m[1], 'id');
+      const ruby = attr(m[1], 'ruby');
+      if (id && ruby && RUBY_TEXT.test(ruby)) ids.add(id);
+    }
+    return ids;
+  }
+
+  function stripRubyText(markup, styles) {
+    const isReading = (attrs) => {
+      const ruby = attr(attrs, 'ruby');
+      if (ruby && RUBY_TEXT.test(ruby)) return true;
+      const style = attr(attrs, 'style');
+      return !!style && style.split(/\s+/).some((id) => styles.has(id));
+    };
+    // innermost spans first, so a reading inside its text container (or the container itself) goes whole
+    const inner = /<span\b([^>]*)>((?:(?!<span\b)[\s\S])*?)<\/span>/;
+    let out = markup;
+    for (let guard = 0; guard < 64 && inner.test(out); guard++) {
+      out = out.replace(inner, (whole, attrs, body) => (isReading(attrs) ? '' : `<kept${attrs}>${body}</kept>`));
+    }
+    return out;
+  }
+
   function normLang(l) {
     if (!l) return null;
     const b = String(l).toLowerCase().split(/[-_]/)[0];
@@ -83,6 +116,7 @@
     const language = normLang(attr(rootTag, 'lang'));
     const tickRate = parseFloat(attr(rootTag, 'tickRate')) || 10000000;
     const frameRate = parseFloat(attr(rootTag, 'frameRate')) || 30;
+    const readingStyles = rubyStyles(xml);
     const cues = [];
     const re = /<p\b([^>]*?)(\/>|>([\s\S]*?)<\/p>)/g;
     let m;
@@ -94,7 +128,7 @@
       const d = ttmlTime(attr(a, 'dur'), tickRate, frameRate);
       if (e == null && b != null && d != null) e = b + d;
       if (b == null || e == null) continue;
-      const text = cleanText(m[3]);
+      const text = cleanText(stripRubyText(m[3], readingStyles));
       if (text) cues.push([round(b), round(e), text]);
     }
     cues.sort((x, y) => x[0] - y[0]);

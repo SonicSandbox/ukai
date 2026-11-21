@@ -66,7 +66,7 @@ popup then shows "N episodes wait: M lines". What you do:
    nothing fakes it. (Shortcut: **Alt+Shift+S**, changeable at `chrome://extensions/shortcuts`.)
 3. Press **Record N clips**. Ukai records each picked line **silently** (nothing is played to your speakers), walks
    through the other waiting episodes in the same window if you leave *also continue* ticked, keeps the window
-   **minimized**, and closes it when done. The popup can be closed; progress is in the popup when you reopen it
+   **small**, and closes it when done. The popup can be closed; progress is in the popup when you reopen it
    ("episode 1 of 2: line 5 of 14"). **Stop** ends it; clips already sent stay, lines not done stay waiting.
    Don't start a video on Netflix while it runs.
 

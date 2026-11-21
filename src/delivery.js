@@ -1,7 +1,6 @@
 // Talks to Surasura on 127.0.0.1:27631 (and nothing else) and keeps undelivered subtitles.
 (function (root) {
   const BASE = 'http://127.0.0.1:27631';
-  const MAX_QUEUE = 20;
 
   async function hello(fetchFn) {
     try {
@@ -38,15 +37,44 @@
   const keyOf = (p) => [p.site, p.video_id, p.language].join('|');
   const RETRY = new Set(['offline', 'busy', 'badtoken']);
 
+  // The waiting list is capped in BYTES (chrome.storage.local holds 10 MB in all; cues are ~3 bytes per
+  // Japanese character and a cover is base64). Counted as UTF-8 bytes of the JSON, as Chrome counts.
+  const MAX_QUEUE_BYTES = 8 * 1024 * 1024;
+  const byteSize = (v) => new TextEncoder().encode(JSON.stringify(v)).length;
+
+  // Pure. Put `incoming` last (replacing the same episode) and fit the list under `cap` bytes:
+  // first the artwork of waiting payloads is dropped (oldest first, the incoming one last); if it still does
+  // not fit, the incoming subtitle is refused. Nothing already waiting is ever thrown away.
+  // -> {queue, refused, coversDropped}
+  function fitQueue(queue, incoming, cap) {
+    const q = queue.filter((p) => keyOf(p) !== keyOf(incoming)).concat([incoming]);
+    let coversDropped = 0;
+    let total = byteSize(q);
+    for (let i = 0; i < q.length && total > cap; i++) {
+      if (q[i].cover) {
+        const { cover, ...rest } = q[i]; // eslint-disable-line no-unused-vars
+        q[i] = rest;
+        coversDropped++;
+        total = byteSize(q);
+      }
+    }
+    if (total > cap) return { queue: queue.filter((p) => keyOf(p) !== keyOf(incoming)), refused: true, coversDropped: 0 };
+    return { queue: q, refused: false, coversDropped };
+  }
+
   // deps: {fetch, storage: {get(key), set(key, value)}}
-  async function deliver(payload, deps) {
+  async function deliver(payload, deps, cap) {
     const token = await deps.storage.get('token');
     const res = await post(payload, token, deps.fetch);
     if (RETRY.has(res.status)) {
-      const q = ((await deps.storage.get('queue')) || []).filter((p) => keyOf(p) !== keyOf(payload));
-      q.push(payload);
-      await deps.storage.set('queue', q.slice(-MAX_QUEUE));
-      res.queued = true;
+      const old = (await deps.storage.get('queue')) || [];
+      const fit = fitQueue(old, payload, cap || MAX_QUEUE_BYTES);
+      let saved = !fit.refused;
+      if (saved) {
+        try { await deps.storage.set('queue', fit.queue); } catch (e) { saved = false; } // quota said no
+      }
+      res.queued = saved;
+      if (!saved) res.queueFull = true;
     }
     return res;
   }
@@ -110,25 +138,34 @@
   // about 3 1/2 minutes in all: making cards from a finished episode can keep Surasura busy for a while
   const WAITS = [2000, 5000, 10000, 15000, 20000, 30000, 30000, 30000, 30000, 30000];
   const realSleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  async function fetchRetry(fetchFn, url, opts, sleep) {
+  // waits `ms` in half-second steps so a Stop is noticed within half a second
+  async function waitInterruptible(ms, sleep, shouldStop) {
+    for (let left = ms; left > 0; left -= 500) {
+      if (shouldStop && shouldStop()) throw new Error('stopped');
+      await (sleep || realSleep)(Math.min(500, left));
+    }
+    if (shouldStop && shouldStop()) throw new Error('stopped');
+  }
+
+  async function fetchRetry(fetchFn, url, opts, sleep, shouldStop) {
     for (let i = 0; ; i++) {
       let r = null, err = null;
       try { r = await fetchFn(url, opts); } catch (e) { err = e; }
       if (r && r.status !== 503) return r;
       console.log('[surasura] ' + url.split('/v1/')[1] + ' ->', r ? r.status + ' (busy)' : 'no answer: ' + err, i < WAITS.length ? '; trying again' : '; giving up');
       if (i >= WAITS.length) { if (r) return r; throw err; }
-      await (sleep || realSleep)(WAITS[i]);
+      await waitInterruptible(WAITS[i], sleep, shouldStop);
     }
   }
 
   // -> 'ok' | 'gone' (404: skip) | 'toolarge' | 'abort' (Surasura still busy / not answering after retries, wrong token)
-  async function postClip(token, job, n, blob, start, end, fetchFn, sleep) {
+  async function postClip(token, job, n, blob, start, end, fetchFn, sleep, shouldStop) {
     try {
       const r = await fetchRetry(fetchFn, BASE + '/v1/jobs/' + job + '/clips/' + n, {
         method: 'POST',
         headers: hdr(token, { 'Content-Type': 'video/webm', 'X-Clip-Start': String(start), 'X-Clip-End': String(end) }),
         body: blob,
-      }, sleep);
+      }, sleep, shouldStop);
       if (r.status === 200) return 'ok';
       if (r.status === 404) return 'gone';
       if (r.status === 413) return 'toolarge';
@@ -139,11 +176,11 @@
     }
   }
 
-  async function postDone(token, job, failed, fetchFn, sleep) {
+  async function postDone(token, job, failed, fetchFn, sleep, shouldStop) {
     try {
       const r = await fetchRetry(fetchFn, BASE + '/v1/jobs/' + job + '/done', {
         method: 'POST', headers: hdr(token, { 'Content-Type': 'application/json' }), body: JSON.stringify({ failed }),
-      }, sleep);
+      }, sleep, shouldStop);
       if (r.status !== 200) console.log('[surasura] done of job ' + job + ': HTTP ' + r.status);
       return r.status === 200;
     } catch (e) {
@@ -166,7 +203,7 @@
     return { status: 'rejected', why: (j && j.why) || 'HTTP ' + r.status };
   }
 
-  const api = { WAITS, BASE, hello, post, deliver, flush, keyOf, buildPayload, getJobs, postClip, postDone, postYoutube };
+  const api = { WAITS, BASE, hello, post, deliver, flush, keyOf, fitQueue, byteSize, MAX_QUEUE_BYTES, buildPayload, getJobs, postClip, postDone, postYoutube };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SurasuraDelivery = api;
 })(typeof self !== 'undefined' ? self : globalThis);

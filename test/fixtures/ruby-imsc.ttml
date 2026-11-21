@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling" xmlns:ttp="http://www.w3.org/ns/ttml#parameter" xml:lang="ja" ttp:tickRate="10000000">
+  <head>
+    <styling>
+      <style xml:id="s1" tts:color="white"/>
+      <style xml:id="rb" tts:ruby="base"/>
+      <style xml:id="rt" tts:ruby="text" tts:fontSize="50%"/>
+      <style xml:id="rc" tts:ruby="container" tts:rubyPosition="before"/>
+    </styling>
+  </head>
+  <body>
+    <div>
+      <p begin="10s" end="12s"><span style="s1"><span style="rc"><span style="rb">黒沼</span><span style="rt">くろぬま</span></span>さん おはよう</span></p>
+      <p begin="13s" end="15s"><span tts:ruby="container"><span tts:ruby="base">駅前</span><span tts:ruby="textContainer"><span tts:ruby="text">えきまえ</span></span></span>で待ってて</p>
+      <p begin="16s" end="18s"><span style="s1">（友達）<span style="rc"><span style="rb">今日</span><span style="s1 rt">きょう</span></span>は<br/>早いね</span></p>
+    </div>
+  </body>
+</tt>
