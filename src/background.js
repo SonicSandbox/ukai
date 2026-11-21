@@ -38,6 +38,22 @@ function loadComplete(tabId, timeoutMs) {
 // is shrunk to a small one instead. Set to true to try minimizing again.
 const MINIMIZE = false;
 
+// Ukai's own window on a site address: muted; `badge` puts a mark on its icon (the one press for a recording).
+async function openOwnWindow(url, badge) {
+  if (!H.isSiteUrl(url, H.siteHosts(chrome.runtime.getManifest()))) return { error: 'not an allowed site address' };
+  const win = await chrome.windows.create({ url, type: 'normal', width: 1100, height: 700, focused: true });
+  const tab = win.tabs[0];
+  await chrome.tabs.update(tab.id, { muted: true }); // nothing is heard before the capture takes over
+  const { own } = await chrome.storage.session.get('own');
+  await chrome.storage.session.set({ own: Object.assign({}, own, { [tab.id]: win.id }) });
+  if (badge) {
+    chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: '#f5b73b' }).catch(() => {});
+    chrome.action.setBadgeText({ tabId: tab.id, text: '▶' }).catch(() => {}); // the icon to press, in this window
+  }
+  quietUntilReady(tab.id); // not awaited
+  return { ok: true, tabId: tab.id, windowId: win.id };
+}
+
 // Best effort: pause the video of a just-opened own window as soon as its player answers (Netflix autoplays).
 async function quietUntilReady(tabId) {
   for (let i = 0; i < 40; i++) {
@@ -52,7 +68,7 @@ async function quietUntilReady(tabId) {
   }
 }
 
-const OWN = new Set(['openOwn', 'ownReady', 'closeWindow', 'content', 'startSeason', 'send', 'status', 'startBatch', 'page', 'navigate', 'closeTab']);
+const OWN = new Set(['openOwn', 'startSeasonOwn', 'tabAlive', 'ownReady', 'closeWindow', 'content', 'startSeason', 'send', 'status', 'startBatch', 'page', 'navigate', 'closeTab']);
 
 chrome.runtime.onMessage.addListener((m, _s, reply) => {
   if (!m || (m.to && m.to !== 'background') || !OWN.has(m.type)) return false; // not for us: let others answer
@@ -92,17 +108,24 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
         await loadComplete(m.tabId, 60000);
         return { ok: true };
       }
-      case 'openOwn': { // Ukai's own window for a job's episode (never the learner's tab)
-        if (!H.isSiteUrl(m.url, H.siteHosts(chrome.runtime.getManifest()))) return { error: 'not an allowed site address' };
-        const win = await chrome.windows.create({ url: m.url, type: 'normal', width: 1100, height: 700, focused: true });
-        const tab = win.tabs[0];
-        await chrome.tabs.update(tab.id, { muted: true }); // nothing is heard before the capture takes over
-        const { own } = await chrome.storage.session.get('own');
-        await chrome.storage.session.set({ own: Object.assign({}, own, { [tab.id]: win.id }) });
-        chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: '#f5b73b' }).catch(() => {});
-        chrome.action.setBadgeText({ tabId: tab.id, text: '▶' }).catch(() => {}); // the icon to press, in this window
-        quietUntilReady(tab.id); // not awaited
-        return { ok: true, tabId: tab.id, windowId: win.id };
+      case 'openOwn': return openOwnWindow(m.url, true); // Ukai's own window for a job's episode (never the learner's tab)
+      case 'startSeasonOwn': {
+        // ONE message from the popup: opening the window takes the focus and Chrome then closes the popup, so the popup
+        // cannot be the one that starts the walk afterwards.
+        const st = await chrome.runtime.sendMessage({ to: 'offscreen', type: 'status' }).catch(() => null);
+        if (st && st.state === 'running') return { ok: false, why: 'Ukai is already recording or walking a season. Stop that first.' };
+        const w = await openOwnWindow(m.url, false);
+        if (w.error) return { ok: false, why: w.error };
+        await ensureOffscreen();
+        const r = await chrome.runtime.sendMessage(Object.assign({}, m, { to: 'offscreen', type: 'startSeason', tabId: w.tabId, windowId: w.windowId }));
+        if (!r || !r.ok) {
+          await chrome.windows.remove(w.windowId).catch(() => {}); // refused: do not leave the window open
+          return { ok: false, why: (r && r.why) || 'no answer' };
+        }
+        return { ok: true };
+      }
+      case 'tabAlive': {
+        try { await chrome.tabs.get(m.tabId); return { alive: true }; } catch (e) { return { alive: false }; }
       }
       case 'ownReady': {
         chrome.action.setBadgeText({ tabId: m.tabId, text: '' }).catch(() => {});

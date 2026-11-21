@@ -20,12 +20,9 @@ async function initSeasonPending(tab) {
     }
     start.disabled = true;
     const url = 'https://www.netflix.com/watch/' + season.episodes[0].id;
-    const w = await chrome.runtime.sendMessage({ type: 'openOwn', url });
-    if (!w || w.error) { msg.className = 'bad'; msg.textContent = 'Could not open the window: ' + ((w && w.error) || 'no answer'); start.disabled = false; return; }
     const { token } = await chrome.storage.local.get('token');
-    const r = await chrome.runtime.sendMessage({
-      type: 'startSeason', tabId: w.tabId, windowId: w.windowId, token, episodes: season.episodes, language: season.language,
-    });
+    // one message: the background opens the window AND starts the walk (the popup closes when the window takes focus)
+    const r = await chrome.runtime.sendMessage({ type: 'startSeasonOwn', url, token, episodes: season.episodes, language: season.language });
     if (!r || !r.ok) { msg.className = 'bad'; msg.textContent = 'Could not start: ' + ((r && r.why) || 'no answer'); start.disabled = false; return; }
     await clear();
   };

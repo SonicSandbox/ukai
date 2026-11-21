@@ -67,6 +67,7 @@ function world(opts = {}) {
     playerReady: async () => (w.readyCalls = (w.readyCalls || 0) + 1) > 1,
     play: async () => { w.playing = true; }, pause: async () => { w.playing = false; },
     mute: async (on) => { w.muted.push(on); },
+    tabAlive: async () => !(opts.closeAfterPosts != null && w.posts.length >= opts.closeAfterPosts),
     build: (st, t, cues, meta, cover) => ({ video_id: st.videoId, language: t.language, episode: meta.episode, cover }),
     post: async (p) => { w.posts.push(p); return opts.post ? opts.post(p, w.posts.length) : { status: 'added' }; },
   };
@@ -175,4 +176,14 @@ test('season walk in Ukai\'s own window: without a startId it does not navigate 
   assert.strictEqual(w.url, '103'); // stays on the last episode: the window is closed by the caller
   assert.strictEqual(w.muted[w.muted.length - 1], false);
   assert.strictEqual(w.navs.filter((u) => u.endsWith('/101')).length, 0);
+});
+
+test('season walk: the window being closed is a stop, not 1 minute of failure per episode', async () => {
+  const w = world({ closeAfterPosts: 1 });
+  const r = await S.walkSeason({ episodes: eps, language: 'ja' }, w.env);
+  assert.strictEqual(r.status, 'ended');
+  assert.match(r.message, /window was closed/);
+  assert.strictEqual(w.posts.length, 1);
+  assert.strictEqual(r.results.length, 1, 'no failed rows for the episodes it never reached');
+  assert.ok(w.clock < 60000, 'did not wait: ' + w.clock);
 });
