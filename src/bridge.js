@@ -23,7 +23,7 @@
       const v = video();
       return {
         ok: !!v, t: v ? v.currentTime : 0, paused: v ? v.paused : true, seeking: v ? v.seeking : false,
-        readyState: v ? v.readyState : 0, apiReady: site.ready ? !!site.ready() : true, url: location.href, blocker: site.blocker ? site.blocker() : null,
+        readyState: v ? v.readyState : 0, apiReady: site.ready ? !!site.ready() : true, url: location.href, visibility: document.visibilityState, blocker: site.blocker ? site.blocker() : null,
       };
     },
   };
@@ -32,6 +32,7 @@
     if (ev.source !== window || !d || d.source !== 'surasura-cmd') return;
     let result, error;
     try { result = await ops[d.op](d.args || {}); } catch (e) { error = String((e && e.message) || e); }
+    if (d.op !== 'state') console.log('[surasura] page command', d.op, JSON.stringify(d.args || {}), error ? 'FAILED: ' + error : 'ok');
     window.postMessage({ source: 'surasura-reply', id: d.id, result: result === undefined ? null : result, error }, '*');
   });
 })();
