@@ -81,7 +81,7 @@ async function initMining(tab, st) {
         }
         const r = await chrome.runtime.sendMessage({
           type: 'startBatch', tabId: tab.id, streamId, token, jobs: order,
-          windowId: tab.windowId, // Ukai's own window: it is minimized while recording and closed afterwards
+          windowId: tab.windowId, // Ukai's own window: closed afterwards
         });
         if (!r || !r.ok) return say([el('p', 'Could not start: ' + ((r && r.why) || 'no answer'), { className: 'bad' })]);
         shown = null;
@@ -90,7 +90,7 @@ async function initMining(tab, st) {
       parts.push(b);
     } else {
       const j0 = j.jobs[0];
-      parts.push(el('p', 'Ukai records in a small window of its own, muted and minimized. Netflix and Disney+ allow only one playing video, ' +
+      parts.push(el('p', 'Ukai records in a small window of its own, muted, and small. Netflix and Disney+ allow only one playing video, ' +
         'so leave any video you have open first. You press the Ukai icon once in that window.', { className: 'muted' }));
       const b = el('button', 'Record now');
       b.onclick = async () => {
@@ -127,7 +127,7 @@ async function initMining(tab, st) {
     const stop = el('button', 'Stop');
     stop.onclick = () => { chrome.runtime.sendMessage({ to: 'offscreen', type: 'stop' }); stop.disabled = true; };
     say([el('h3', season ? 'Season walk' : 'Mining'), line,
-      el('p', season ? 'Keep this tab open. You can close this popup.' : 'Ukai\'s own window works by itself (it stays minimized). Don\'t close it and don\'t start a video on Netflix meanwhile. You can close this popup.', { className: 'muted' }), stop],
+      el('p', season ? 'Keep this tab open. You can close this popup.' : 'Ukai\'s own window works by itself (a small window). Don\'t close it and don\'t start a video on Netflix meanwhile. You can close this popup.', { className: 'muted' }), stop],
     'running');
   }
 
@@ -148,6 +148,7 @@ async function initMining(tab, st) {
     if (r.status === 'stopped') return 'Stopped. ' + base;
     if (r.status === 'aborted') return 'Surasura did not answer (busy or closed) after several tries, so the batch was stopped. What it had got is kept; press Record now again to go on. ' + base;
     if (r.status === 'needs-click') return r.message + ' ' + base;
+    if (r.status === 'ended') return 'Ukai\'s window or its capture was closed, so the recording stopped. Lines not done stay waiting: press Record now to go on. ' + base;
     return 'Stopped by an error: ' + (r.message || '') + ' ' + base;
   }
 

@@ -131,7 +131,7 @@ test('v2 posts: a busy (503) Surasura is tried again before giving up; a missing
   let n = 0;
   const busyTwice = async () => ({ status: ++n <= 2 ? 503 : 200 });
   assert.strictEqual(await D.postDone('t', 7, [], busyTwice, sleep), true);
-  assert.deepStrictEqual(sleeps, [2000, 5000]);
+  assert.strictEqual(sleeps.reduce((a, b) => a + b, 0), 7000); // 2 s + 5 s, waited in half-second steps
   assert.ok(D.WAITS.reduce((a, b) => a + b, 0) >= 150000, 'patient for at least 2 1/2 minutes');
   n = 0; sleeps.length = 0;
   assert.strictEqual(await D.postClip('t', 7, 0, new Blob(['x']), 1, 2, busyTwice, sleep), 'ok');
@@ -143,4 +143,15 @@ test('v2 posts: a busy (503) Surasura is tried again before giving up; a missing
   assert.strictEqual(await D.postClip('t', 7, 0, new Blob(['x']), 1, 2, async () => { calls++; return { status: 404 }; }, sleep), 'gone');
   assert.strictEqual(calls, 1);
   assert.strictEqual(await D.postClip('t', 7, 0, new Blob(['x']), 1, 2, async () => { throw new Error('down'); }, sleep), 'abort');
+});
+
+test('a Stop is noticed during the busy waits (within half a second), not after minutes', async () => {
+  let stop = false, slept = 0, calls = 0;
+  const sleep = async (ms) => { slept += ms; if (slept >= 1000) stop = true; };
+  const r = await D.postClip('t', 7, 0, new Blob(['x']), 1, 2, async () => { calls++; return { status: 503 }; }, sleep, () => stop);
+  assert.strictEqual(r, 'abort');
+  assert.strictEqual(calls, 1);
+  assert.ok(slept <= 1500, 'slept ' + slept);
+  stop = false; slept = 0;
+  assert.strictEqual(await D.postDone('t', 7, [], async () => ({ status: 503 }), async () => { stop = true; }, () => stop), false);
 });

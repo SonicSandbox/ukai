@@ -18,7 +18,7 @@ function world(opts = {}) {
     shouldStop: () => !!(w.stopAfter != null && w.clips.length >= w.stopAfter),
     onProgress: (p) => w.log.push(p),
     navigate: async (u) => { w.url = u; w.t = 0; },
-    streamAlive: () => (opts.alive === undefined ? true : opts.alive),
+    streamAlive: () => (opts.dieAfterClips != null ? w.clips.length < opts.dieAfterClips : opts.alive === undefined ? true : opts.alive),
     player: {
       hideUi: async () => { w.hidden = true; w.hiddenBeforeSeek = w.seekCalls === undefined; },
       showUi: async () => { w.hidden = false; },
@@ -161,4 +161,32 @@ test('afterwards each episode is put back where it opened (the learner\'s point)
   assert.strictEqual(r2.status, 'stopped');
   assert.ok(Math.abs(w2.t - 500) < 4, 'back at 500 after Stop: ' + w2.t);
   assert.strictEqual(w2.playing, false);
+});
+
+test('the window/capture dying mid-batch stops quietly: no failed lines posted, no done, next jobs untouched', async () => {
+  const w = world({ dieAfterClips: 1 });
+  const jobs = [job(1, [[0, 10, 12], [1, 20, 22], [2, 30, 32]]), job(2, [[0, 10, 12]], { video_id: 'V2', url: 'https://x/watch/V2' })];
+  const r = await W.runBatch(jobs, w.env);
+  assert.strictEqual(r.status, 'ended');
+  assert.strictEqual(w.clips.length, 1);
+  assert.strictEqual(w.done.length, 0, 'the remaining lines stay waiting at Surasura');
+  assert.strictEqual(w.url, 'https://x/watch/V1', 'job 2 was never opened');
+});
+
+test('the capture ending between episodes: no waiting, no failed post; the message says Record now', async () => {
+  const w = world({ dieAfterClips: 1 });
+  const jobs = [job(1, [[0, 10, 12]]), job(2, [[0, 10, 12]], { video_id: 'V2', url: 'https://x/watch/V2' })];
+  const r = await W.runBatch(jobs, w.env);
+  assert.strictEqual(r.status, 'ended');
+  assert.strictEqual(w.done.length, 1); // job 1 finished and was reported; job 2 is untouched
+  assert.strictEqual(w.done[0].job, 1);
+  assert.ok(w.clock < 20000, 'did not wait: ' + w.clock);
+});
+
+test('a Stop during the busy retries ends the batch as stopped, not aborted', async () => {
+  const w = world({ postResult: 'abort', stopAfterAbort: true });
+  w.env.api.postClip = async () => { w.stopAfter = 0; return 'abort'; }; // Stop pressed while retrying
+  const r = await W.runBatch([job(1, [[0, 10, 12], [1, 20, 22]])], w.env);
+  assert.strictEqual(r.status, 'stopped');
+  assert.strictEqual(w.done.length, 0);
 });

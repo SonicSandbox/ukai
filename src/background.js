@@ -99,10 +99,13 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
         await chrome.tabs.update(tab.id, { muted: true }); // nothing is heard before the capture takes over
         const { own } = await chrome.storage.session.get('own');
         await chrome.storage.session.set({ own: Object.assign({}, own, { [tab.id]: win.id }) });
+        chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: '#f5b73b' }).catch(() => {});
+        chrome.action.setBadgeText({ tabId: tab.id, text: '▶' }).catch(() => {}); // the icon to press, in this window
         quietUntilReady(tab.id); // not awaited
         return { ok: true, tabId: tab.id, windowId: win.id };
       }
       case 'ownReady': {
+        chrome.action.setBadgeText({ tabId: m.tabId, text: '' }).catch(() => {});
         await chrome.tabs.update(m.tabId, { muted: false }).catch(() => {});
         if (MINIMIZE) await chrome.windows.update(m.windowId, { state: 'minimized' }).catch(() => {});
         else await chrome.windows.update(m.windowId, { width: 480, height: 320 }).catch(() => {});
