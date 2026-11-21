@@ -18,7 +18,7 @@ function world(opts = {}) {
     shouldStop: () => !!(w.stopAfter != null && w.clips.length >= w.stopAfter),
     onProgress: (p) => w.log.push(p),
     navigate: async (u) => { w.url = u; w.t = 0; },
-    streamAlive: () => (opts.alive === undefined ? true : opts.alive),
+    streamAlive: () => (opts.dieAfterClips != null ? w.clips.length < opts.dieAfterClips : opts.alive === undefined ? true : opts.alive),
     player: {
       hideUi: async () => { w.hidden = true; w.hiddenBeforeSeek = w.seekCalls === undefined; },
       showUi: async () => { w.hidden = false; },
@@ -125,34 +125,6 @@ test('second episode: navigates; if the capture died, stop and ask for a click w
   const r2 = await W.runBatch(jobs, w2.env);
   assert.strictEqual(r2.status, 'done');
   assert.strictEqual(w2.done.length, 2);
-  assert.strictEqual(w2.url, 'https://x/watch/V1', 'back on the episode the batch began on');
-});
-
-test('afterwards: back to the episode and moment the learner was at, paused', async () => {
-  const w = world();
-  w.url = 'https://x/watch/V0?trackId=9';
-  w.t = 1234.5;
-  const jobs = [job(1, [[0, 10, 12]]), job(2, [[0, 20, 22]], { video_id: 'V2', url: 'https://x/watch/V2' })];
-  const r = await W.runBatch(jobs, w.env);
-  assert.strictEqual(r.status, 'done');
-  assert.strictEqual(r.back, true);
-  assert.strictEqual(w.url, 'https://x/watch/V0?trackId=9');
-  assert.ok(Math.abs(w.t - 1234.5) < 0.01, 'at its time: ' + w.t);
-  assert.strictEqual(w.playing, false);
-});
-
-test('Stop goes back too; a click still needed does not move the tab', async () => {
-  const w = world({ stopAfter: 1 });
-  w.url = 'https://x/watch/V1';
-  w.t = 50;
-  const r = await W.runBatch([job(1, [[0, 10, 12], [1, 20, 22]])], w.env);
-  assert.strictEqual(r.status, 'stopped');
-  assert.ok(Math.abs(w.t - 50) < 0.01, 'same episode: only the time is put back: ' + w.t);
-  const w2 = world({ alive: false });
-  w2.url = 'https://x/watch/V0';
-  const r2 = await W.runBatch([job(2, [[0, 10, 12]], { video_id: 'V2', url: 'https://x/watch/V2' })], w2.env);
-  assert.strictEqual(r2.status, 'needs-click');
-  assert.strictEqual(w2.url, 'https://x/watch/V2');
 });
 
 test('black picture / silence are failures with advice; UI is hidden while recording and restored', async () => {
@@ -171,4 +143,50 @@ test('UI is hidden before the first seek, and restored even when the line fails'
   await W.runBatch([job(1, [[0, 10, 12]])], w.env);
   assert.strictEqual(w.hiddenBeforeSeek, true);
   assert.strictEqual(w.hidden, false);
+});
+
+test('afterwards each episode is put back where it opened (the learner\'s point), paused; also after Stop', async () => {
+  const w = world();
+  w.t = 1234.5; // Netflix resumed here
+  const jobs = [job(1, [[0, 10, 12]]), job(2, [[0, 20, 22]], { video_id: 'V2', url: 'https://x/watch/V2' })];
+  const r = await W.runBatch(jobs, w.env);
+  assert.strictEqual(r.status, 'done');
+  // job 2 opened at t=0 (a fresh page): its last position is back near 0, job 1's was put back near 1234.5 before that
+  assert.ok(w.t < 5, 'the second episode is back at its start: ' + w.t);
+  assert.strictEqual(w.playing, false);
+
+  const w2 = world({ stopAfter: 1 });
+  w2.t = 500;
+  const r2 = await W.runBatch([job(1, [[0, 10, 12], [1, 20, 22]])], w2.env);
+  assert.strictEqual(r2.status, 'stopped');
+  assert.ok(Math.abs(w2.t - 500) < 4, 'back at 500 after Stop: ' + w2.t);
+  assert.strictEqual(w2.playing, false);
+});
+
+test('the window/capture dying mid-batch stops quietly: no failed lines posted, no done, next jobs untouched', async () => {
+  const w = world({ dieAfterClips: 1 });
+  const jobs = [job(1, [[0, 10, 12], [1, 20, 22], [2, 30, 32]]), job(2, [[0, 10, 12]], { video_id: 'V2', url: 'https://x/watch/V2' })];
+  const r = await W.runBatch(jobs, w.env);
+  assert.strictEqual(r.status, 'ended');
+  assert.strictEqual(w.clips.length, 1);
+  assert.strictEqual(w.done.length, 0, 'the remaining lines stay waiting at Surasura');
+  assert.strictEqual(w.url, 'https://x/watch/V1', 'job 2 was never opened');
+});
+
+test('the capture ending between episodes: no waiting, no failed post; the message says Record now', async () => {
+  const w = world({ dieAfterClips: 1 });
+  const jobs = [job(1, [[0, 10, 12]]), job(2, [[0, 10, 12]], { video_id: 'V2', url: 'https://x/watch/V2' })];
+  const r = await W.runBatch(jobs, w.env);
+  assert.strictEqual(r.status, 'ended');
+  assert.strictEqual(w.done.length, 1); // job 1 finished and was reported; job 2 is untouched
+  assert.strictEqual(w.done[0].job, 1);
+  assert.ok(w.clock < 20000, 'did not wait: ' + w.clock);
+});
+
+test('a Stop during the busy retries ends the batch as stopped, not aborted', async () => {
+  const w = world({ postResult: 'abort', stopAfterAbort: true });
+  w.env.api.postClip = async () => { w.stopAfter = 0; return 'abort'; }; // Stop pressed while retrying
+  const r = await W.runBatch([job(1, [[0, 10, 12], [1, 20, 22]])], w.env);
+  assert.strictEqual(r.status, 'stopped');
+  assert.strictEqual(w.done.length, 0);
 });

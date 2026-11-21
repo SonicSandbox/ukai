@@ -19,7 +19,7 @@ Ukai brings the subtitles and clips of what you watch home to your local Surasur
 
 | 📥 Subtitles into your library | 🎬 Clips for your cards |
 | :---: | :---: |
-| One click sends the subtitles of the episode you are watching to Surasura, where it lands in the library like a YouTube transcript. | When Surasura picks lines for your Anki cards, Ukai records one short clip (picture + sound) of each line, in your own tab. |
+| One click sends the subtitles of the episode you are watching to Surasura, where it lands in the library like a YouTube transcript. | When Surasura picks lines for your Anki cards, Ukai records one short clip (picture + sound) of each line, in a window of its own. |
 | **📚 A whole season** *(experimental, Netflix)* | **▶️ YouTube** |
 | Walks your tab through the season's episodes and sends each one's subtitles, then brings you back. | On a video or a playlist, sends its link to Surasura. Nothing is recorded or downloaded. |
 
@@ -58,17 +58,17 @@ once.*
 Surasura queues an episode, picks its words and waits for one short video clip (picture + sound, webm) per line. The
 popup then shows "N episodes wait: M lines". What you do:
 
-1. **Click the extension icon on the episode's own tab** (the watch page of that episode, logged in as usual). If that
-   episode is not open, the popup has **Open this episode**: it opens (or finds) the tab, then you click the icon again
-   on that tab. This click is required: Chrome only lets an extension capture a tab after you invoke the extension on
-   that tab. Nothing fakes it. A keyboard shortcut (default **Alt+Shift+S**, changeable at
-   `chrome://extensions/shortcuts`) opens the popup and grants the same tab permission as the icon.
-2. Press **Record N clips**. Tick *also continue with the other waiting episodes in this tab* to let it walk through the
-   rest by navigating the same tab (best effort: if Chrome ends the capture when the tab changes page, it stops and says
-   "click the icon again").
-3. Leave the tab open and the video visible (do not minimise the window). The popup can be closed; progress is in the
-   popup when you reopen it ("episode 1 of 2: line 5 of 14"). **Stop** ends it; clips already sent stay, lines not done
-   stay waiting.
+1. **Leave any video you have open** (go back from the player to the browse page). Netflix and Disney+ play one video
+   at a time, so a second player would just spin. Ukai never uses or touches your own tab; the popup says so if a video
+   is still open.
+2. Press **Record now**. Ukai opens a small window **of its own** on the episode (muted, paused). **Click the Ukai icon
+   in that window once**: Chrome only lets an extension capture a tab after you invoke the extension on that tab, and
+   nothing fakes it. (Shortcut: **Alt+Shift+S**, changeable at `chrome://extensions/shortcuts`.)
+3. Press **Record N clips**. Ukai records each picked line **silently** (nothing is played to your speakers), walks
+   through the other waiting episodes in the same window if you leave *also continue* ticked, keeps the window
+   **small**, and closes it when done. The popup can be closed; progress is in the popup when you reopen it
+   ("episode 1 of 2: line 5 of 14"). **Stop** ends it; clips already sent stay, lines not done stay waiting.
+   Don't start a video on Netflix while it runs.
 
 <details>
 <summary>How a clip is recorded</summary>
@@ -83,21 +83,28 @@ popup then shows "N episodes wait: M lines". What you do:
 - **The page:** from before the seek until the clip is done, everything on the page except the video is made invisible
   (one attribute-based rule, black background, scrollbars hidden too; no class names guessed) and restored afterwards,
   also on failure or Stop.
-- **Sound stays audible** while recording (the captured sound is played back, since Chrome would otherwise mute the
-  tab).
-- A tab the extension opened itself is closed afterwards.
-- Only what plays in your own tab is recorded; the stream itself is never downloaded or saved, and clips go only to
+- **Silent:** the captured sound is not played back (Chrome takes a captured tab's sound from the speakers), and the
+  window is muted until the capture is live.
+- **Put back where it began:** after each episode Ukai seeks back to the point the episode opened at (Netflix resumes at
+  yours), plays a moment so the site saves it, and pauses, so *Continue watching* is not left at the last recorded line.
+- Ukai's own window is closed afterwards.
+- Only what plays in Ukai's own window is recorded; the stream itself is never downloaded or saved, and clips go only to
   `127.0.0.1:27631`.
 
 </details>
 
 ### Send the whole season *(experimental, Netflix)*
 
-Netflix only delivers an episode's subtitle file when that episode's page plays. So this walks the same tab through each
-episode of the season (muted, about 20–30 seconds each, roughly 10 minutes for 24 episodes), lets the player load the
-subtitles in the language you chose, posts each one, then returns to your episode. Switch subtitles on once for the
-show so Netflix remembers the language. Progress and Stop are in the popup; an episode without that language is
-reported and skipped. Not yet tried against a live account.
+Netflix only delivers an episode's subtitle file when that episode's page plays. So the walk plays each episode of the
+season in **a window of Ukai's own**, muted, about 20–30 seconds each (roughly 10 minutes for 24 episodes), lets the
+player load the subtitles in the language you chose, and posts each one. It never uses or moves your own tab.
+
+1. In an episode, press **Plan the whole season**. (Switch subtitles on once for the show so Netflix remembers the language.)
+2. Leave the video (back to the browse page): Netflix plays one video at a time.
+3. Open Ukai and press **Start the season walk**. Ukai's window opens, walks the episodes and closes. Progress and Stop are
+   in the popup; an episode without that language is reported and skipped.
+
+Not yet tried against a live account.
 
 ### YouTube
 

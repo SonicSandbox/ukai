@@ -67,11 +67,13 @@
     const results = [];
     const n = opts.episodes.length;
     let status = 'done';
+    let message;
     let known = null; // the show's metadata, read from an episode already walked
     try {
       for (let i = 0; i < n; i++) {
         const ep = opts.episodes[i];
         if (env.shouldStop()) throw STOP;
+        if (env.tabAlive && !(await env.tabAlive())) { status = 'ended'; message = 'Ukai\'s window was closed, so the season walk stopped.'; break; }
         env.onProgress({ kind: 'season', i: i + 1, n, title: ep.title || 'episode ' + ep.seq, done: results.filter((r) => r.ok).length });
         try {
           const found = await loadEpisode(ep, opts, env, (attempt) => env.onProgress({
@@ -111,7 +113,7 @@
       const now = await env.getState().catch(() => null);
       if (opts.startId && !(now && now.videoId === String(opts.startId))) await env.navigate('https://www.netflix.com/watch/' + opts.startId);
     } catch (e) { /* best effort */ }
-    return { status, results };
+    return { status, results, message };
   }
 
   const api = { walkSeason, STOP };
