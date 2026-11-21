@@ -60,6 +60,60 @@ test('401 is queued, 400 is not, 503 is busy', async () => {
   assert.strictEqual((await D.deliver(payload, d3)).status, 'busy');
 });
 
+// ---- the waiting list is capped in bytes ----
+const big = (id, chars, cover) => {
+  const p = { schema: 1, site: 'netflix', video_id: id, language: 'ja', title: 't', cues: [[0, 1, 'あ'.repeat(chars)]] };
+  if (cover) p.cover = cover;
+  return p;
+};
+
+test('byteSize counts UTF-8 bytes, not characters', () => {
+  assert.strictEqual(D.byteSize('あ'), 5); // 3 bytes + 2 quotes
+  assert.ok(D.byteSize(big('1', 1000)) > 3000);
+});
+
+test('fitQueue: under the cap everything stays, same episode is replaced', () => {
+  const q = [big('1', 10), big('2', 10)];
+  const r = D.fitQueue(q, big('2', 20), 100000);
+  assert.deepStrictEqual(r.queue.map((p) => p.video_id), ['1', '2']);
+  assert.strictEqual(r.queue[1].cues[0][2].length, 20);
+  assert.strictEqual(r.refused, false);
+});
+
+test('fitQueue: at the edge the artwork goes first, and nothing waiting is dropped', () => {
+  const cover = 'A'.repeat(2000);
+  const a = big('1', 100, cover), b = big('2', 100, cover);
+  const withCovers = D.byteSize([a, b]);
+  const without = D.byteSize([big('1', 100), big('2', 100)]);
+  // exactly fits: kept untouched
+  let r = D.fitQueue([a], b, withCovers);
+  assert.strictEqual(r.refused, false); assert.strictEqual(r.coversDropped, 0);
+  // one byte short: covers are dropped, both subtitles stay
+  r = D.fitQueue([a], b, withCovers - 1);
+  assert.strictEqual(r.refused, false);
+  assert.strictEqual(r.queue.length, 2);
+  assert.ok(r.coversDropped >= 1);
+  assert.ok(D.byteSize(r.queue) <= withCovers - 1);
+  // the waiting one loses its cover before the incoming one does
+  assert.ok(!r.queue[0].cover);
+  // even without any artwork it does not fit: the NEW one is refused, the old stay
+  r = D.fitQueue([a], b, without - 1);
+  assert.strictEqual(r.refused, true);
+  assert.deepStrictEqual(r.queue.map((p) => p.video_id), ['1']);
+});
+
+test('deliver: a full list says so (queueFull) and keeps what waits; a rejected storage.set is the same', async () => {
+  const d = mkDeps(fakeFetch(() => new Error('refused')));
+  d.mem.queue = [big('1', 100)];
+  const r = await D.deliver(big('2', 100), d, D.byteSize([big('1', 100)]) + 10);
+  assert.strictEqual(r.status, 'offline'); assert.strictEqual(r.queued, false); assert.strictEqual(r.queueFull, true);
+  assert.deepStrictEqual(d.mem.queue.map((p) => p.video_id), ['1']);
+  const d2 = mkDeps(fakeFetch(() => new Error('refused')));
+  d2.storage.set = async () => { throw new Error('QUOTA_BYTES quota exceeded'); };
+  const r2 = await D.deliver(big('3', 5), d2);
+  assert.strictEqual(r2.queueFull, true);
+});
+
 test('buildPayload: film has no show, season/episode optional, query stripped', () => {
   const st = { site: 'disneyplus', videoId: 'v', url: 'https://x/play/v?a=1#b', docTitle: 'Doc' };
   const p = D.buildPayload(st, { language: null }, [], { title: '', show: '', season: '', episode: '' });

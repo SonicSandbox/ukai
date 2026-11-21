@@ -1,7 +1,6 @@
 // Talks to Surasura on 127.0.0.1:27631 (and nothing else) and keeps undelivered subtitles.
 (function (root) {
   const BASE = 'http://127.0.0.1:27631';
-  const MAX_QUEUE = 20;
 
   async function hello(fetchFn) {
     try {
@@ -38,15 +37,44 @@
   const keyOf = (p) => [p.site, p.video_id, p.language].join('|');
   const RETRY = new Set(['offline', 'busy', 'badtoken']);
 
+  // The waiting list is capped in BYTES (chrome.storage.local holds 10 MB in all; cues are ~3 bytes per
+  // Japanese character and a cover is base64). Counted as UTF-8 bytes of the JSON, as Chrome counts.
+  const MAX_QUEUE_BYTES = 8 * 1024 * 1024;
+  const byteSize = (v) => new TextEncoder().encode(JSON.stringify(v)).length;
+
+  // Pure. Put `incoming` last (replacing the same episode) and fit the list under `cap` bytes:
+  // first the artwork of waiting payloads is dropped (oldest first, the incoming one last); if it still does
+  // not fit, the incoming subtitle is refused. Nothing already waiting is ever thrown away.
+  // -> {queue, refused, coversDropped}
+  function fitQueue(queue, incoming, cap) {
+    const q = queue.filter((p) => keyOf(p) !== keyOf(incoming)).concat([incoming]);
+    let coversDropped = 0;
+    let total = byteSize(q);
+    for (let i = 0; i < q.length && total > cap; i++) {
+      if (q[i].cover) {
+        const { cover, ...rest } = q[i]; // eslint-disable-line no-unused-vars
+        q[i] = rest;
+        coversDropped++;
+        total = byteSize(q);
+      }
+    }
+    if (total > cap) return { queue: queue.filter((p) => keyOf(p) !== keyOf(incoming)), refused: true, coversDropped: 0 };
+    return { queue: q, refused: false, coversDropped };
+  }
+
   // deps: {fetch, storage: {get(key), set(key, value)}}
-  async function deliver(payload, deps) {
+  async function deliver(payload, deps, cap) {
     const token = await deps.storage.get('token');
     const res = await post(payload, token, deps.fetch);
     if (RETRY.has(res.status)) {
-      const q = ((await deps.storage.get('queue')) || []).filter((p) => keyOf(p) !== keyOf(payload));
-      q.push(payload);
-      await deps.storage.set('queue', q.slice(-MAX_QUEUE));
-      res.queued = true;
+      const old = (await deps.storage.get('queue')) || [];
+      const fit = fitQueue(old, payload, cap || MAX_QUEUE_BYTES);
+      let saved = !fit.refused;
+      if (saved) {
+        try { await deps.storage.set('queue', fit.queue); } catch (e) { saved = false; } // quota said no
+      }
+      res.queued = saved;
+      if (!saved) res.queueFull = true;
     }
     return res;
   }
@@ -166,7 +194,7 @@
     return { status: 'rejected', why: (j && j.why) || 'HTTP ' + r.status };
   }
 
-  const api = { WAITS, BASE, hello, post, deliver, flush, keyOf, buildPayload, getJobs, postClip, postDone, postYoutube };
+  const api = { WAITS, BASE, hello, post, deliver, flush, keyOf, fitQueue, byteSize, MAX_QUEUE_BYTES, buildPayload, getJobs, postClip, postDone, postYoutube };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SurasuraDelivery = api;
 })(typeof self !== 'undefined' ? self : globalThis);
