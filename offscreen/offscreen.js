@@ -123,6 +123,7 @@ async function startSeason(m) {
     shouldStop: () => stopFlag,
     onProgress: (p) => { status = { state: 'running', progress: p }; },
     navigate: (url) => relay({ type: 'navigate', tabId: m.tabId, url }),
+    tabAlive: async () => ((await relay({ type: 'tabAlive', tabId: m.tabId })) || {}).alive !== false,
     getState: () => ask({ type: 'getState' }),
     getCues: (key) => ask({ type: 'getCues', key }),
     getMeta: async () => (await ask({ type: 'getMeta' })).meta,
@@ -134,11 +135,13 @@ async function startSeason(m) {
     post: (payload) => D.post(payload, m.token, fetch),
   };
   try {
-    const r = await self.SurasuraSeason.walkSeason({ episodes: m.episodes, language: m.language, startId: m.startId }, env);
+    const r = await self.SurasuraSeason.walkSeason({ episodes: m.episodes, language: m.language }, env);
     log('season finished:', JSON.stringify(r));
-    status = { state: 'finished', result: { kind: 'season', status: r.status, results: r.results } };
+    status = { state: 'finished', result: { kind: 'season', status: r.status, results: r.results, message: r.message } };
   } catch (e) {
     status = { state: 'finished', result: { kind: 'season', status: 'error', message: String((e && e.message) || e), results: [] } };
+  } finally {
+    if (m.windowId) relay({ type: 'closeWindow', windowId: m.windowId });
   }
 }
 
