@@ -5,6 +5,7 @@
 //   player:   {seek(t), play(), pause(), state() -> {ok, t, paused, seeking, readyState, url, blocker}}
 //   recorder: {start() -> Promise, stop() -> Promise<{size}>}      (one clip at a time)
 //   api:      {postClip(job, n, blob, start, end) -> 'ok'|'gone'|'toolarge'|'abort', postDone(job, failed) -> bool}
+//   (postClip / postDone -> 'abort' / false while env.shouldStop() count as a Stop)
 //   navigate(url), streamAlive() -> bool, sleep(ms), now() -> ms, shouldStop() -> bool, onProgress(p)
 // }
 (function (root) {
@@ -12,6 +13,7 @@
   const GIVE_UP_AFTER = 3; // consecutive failed lines in one job
   const STOP = { stop: true };
   const ABORT = { abort: true };
+  const END = { ended: true }; // Ukai's window / its capture is gone: stop, post nothing, the lines stay waiting
 
   async function waitFor(env, pred, timeoutMs, step) {
     const t0 = env.now();
@@ -24,7 +26,8 @@
     }
   }
 
-  const blockerNote = (s) => (s && s.blocker ? ` (${s.blocker})` : '');
+  const blockerNote = (s) => (s && s.blocker ? ` (${s.blocker})` : '') +
+    (s && s.visibility ? ` [t=${Number(s.t).toFixed(1)}, readyState=${s.readyState}, page ${s.visibility}]` : '');
 
   async function recordLine(job, line, env) {
     // everything but the video is hidden from before the seek until the clip is done (also on failure / Stop)
@@ -82,7 +85,7 @@
       if (q.black) return { why: 'recorded a black picture' + tip };
       if (q.silent) return { why: 'recorded exact silence' + tip };
       const r = await env.api.postClip(job, line.n, blob, clipStart, clipEnd);
-      if (r === 'abort') throw ABORT;
+      if (r === 'abort') throw env.shouldStop() ? STOP : ABORT; // a Stop during the retries is a Stop, not a failure
       if (r === 'toolarge') return { why: 'clip too large for Surasura' };
       return { ok: true, gone: r === 'gone' };
     } finally {
@@ -99,6 +102,7 @@
     try {
       for (let i = 0; i < lines.length; i++) {
         if (env.shouldStop()) throw STOP;
+        if (!env.streamAlive()) throw END; // window closed / capture ended: do not report the rest as failed
         env.onProgress(Object.assign({}, prog, { line: i + 1, lines: lines.length, recorded, failed: failed.length }));
         if (streak >= GIVE_UP_AFTER) {
           failed.push({ n: lines[i].n, why: `skipped after ${GIVE_UP_AFTER} failures in a row` });
@@ -108,7 +112,7 @@
         try {
           r = await recordLine(job, lines[i], env);
         } catch (e) {
-          if (e === STOP || e === ABORT) throw e;
+          if (e === STOP || e === ABORT || e === END) throw e;
           r = { why: 'error: ' + (e && e.message ? e.message : e) };
         }
         if (r.ok) { if (!r.gone) recorded++; streak = 0; }
@@ -117,9 +121,10 @@
     } catch (e) {
       if (e === STOP) return { status: 'stopped', recorded, failed };
       if (e === ABORT) return { status: 'aborted', recorded, failed };
+      if (e === END) return { status: 'ended', recorded, failed };
       throw e;
     }
-    if (!(await env.api.postDone(job, failed))) return { status: 'aborted', recorded, failed };
+    if (!(await env.api.postDone(job, failed))) return { status: env.shouldStop() ? 'stopped' : 'aborted', recorded, failed };
     return { status: 'done', recorded, failed };
   }
 
@@ -135,40 +140,31 @@
       }, 45000, 500);
       if (!s) return { ok: false, why: 'the player did not start (profile, sign-in or "still watching" screen?)' };
     }
-    if (!env.streamAlive()) return { ok: false, fatal: true, why: 'the capture ended when the tab changed page' };
+    if (!env.streamAlive()) {
+      await P.pause().catch(() => {}); // the new episode may already be playing (autoplay): quiet it
+      return { ok: false, fatal: true, why: 'the capture ended when the page changed' };
+    }
     await P.pause();
-    return { ok: true };
+    const at = await P.state().catch(() => null);
+    return { ok: true, was: at && at.ok && typeof at.t === 'number' ? { t: at.t } : null };
   }
 
-  const pageOf = (url) => String(url || '').split(/[?#]/)[0];
-
-  // Where the tab was when the batch began: its video's page and time. -> {url, t} | null
-  async function whereNow(env) {
-    const s = await env.player.state().catch(() => null);
-    return s && s.ok && s.url && typeof s.t === 'number' ? { url: s.url, t: s.t } : null;
-  }
-
-  // Back to the episode and the moment the learner was at before the batch, paused there. Best effort: never throws.
+  // Put the episode back where it was when Ukai's window opened it (the learner's point, which Netflix resumed at), so
+  // *Continue watching* is not left at the last recorded line: seek, play a moment so the site saves it, pause.
+  // Best effort: never throws, and a Stop does not skip it.
   async function goBack(env, was) {
     if (!was) return false;
     const P = env.player;
     const env2 = Object.assign({}, env, { shouldStop: () => false });
     try {
-      let s = await P.state().catch(() => ({ ok: false }));
-      if (!(s.ok && pageOf(s.url) === pageOf(was.url))) {
-        await env.navigate(was.url);
-        s = await waitFor(env2, async () => {
-          const x = await P.state().catch(() => ({ ok: false }));
-          return x.ok && pageOf(x.url) === pageOf(was.url) && x.readyState >= 2 && x;
-        }, 45000, 500);
-        if (!s) return false;
-      }
       await P.pause();
       await P.seek(was.t);
       await waitFor(env2, async () => {
         const x = await P.state().catch(() => ({ ok: false }));
         return x.ok && !x.seeking && Math.abs(x.t - was.t) <= 3 && x;
       }, 15000);
+      await P.play();
+      await env.sleep(2000);
       await P.pause();
       return true;
     } catch (e) {
@@ -176,13 +172,9 @@
     }
   }
 
-  // jobs in the order to walk; afterwards the tab goes back to where it was (`goBack`), unless a click is needed to go
-  // on. -> {status, results:[{job, status, recorded, failed}], message?, back?}
+  // jobs in the order to walk, in Ukai's own window. -> {status, results:[{job, status, recorded, failed}], message?}
   async function runBatch(jobs, env) {
-    const was = await whereNow(env);
-    const r = await runJobs(jobs, env);
-    if (r.status !== 'needs-click') r.back = await goBack(env, was);
-    return r;
+    return runJobs(jobs, env);
   }
 
   async function runJobs(jobs, env) {
@@ -191,17 +183,19 @@
       const job = jobs[j];
       const prog = { jobIndex: j + 1, jobs: jobs.length, title: job.title };
       if (env.shouldStop()) return { status: 'stopped', results };
+      if (j > 0 && !env.streamAlive()) return { status: 'ended', results }; // not 45 s of waiting and a failed post per episode
       env.onProgress(Object.assign({}, prog, { line: 0, lines: job.lines.length, recorded: 0, failed: 0, opening: true }));
       let o;
       try { o = await openJob(job, env); } catch (e) { if (e === STOP) return { status: 'stopped', results }; throw e; }
       if (!o.ok) {
-        if (o.fatal) return { status: 'needs-click', results, message: `${o.why}. Click the extension icon on this tab again to continue with "${job.title}".` };
+        if (o.fatal) return { status: 'needs-click', results, message: `${o.why}. Press Record now again to go on with "${job.title}".` };
         const failed = job.lines.map((l) => ({ n: l.n, why: o.why }));
-        if (!(await env.api.postDone(job, failed))) return { status: 'aborted', results };
+        if (!(await env.api.postDone(job, failed))) return { status: env.shouldStop() ? 'stopped' : 'aborted', results };
         results.push({ job: job.job, status: 'done', recorded: 0, failed });
         continue;
       }
       const r = await walkJob(job, env, prog);
+      if (r.status !== 'ended') await goBack(env, o.was);
       results.push({ job: job.job, status: r.status, recorded: r.recorded, failed: r.failed });
       if (r.status !== 'done') return { status: r.status, results };
     }

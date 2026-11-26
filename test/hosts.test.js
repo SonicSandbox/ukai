@@ -16,6 +16,16 @@ test('own sites pass (https, host or subdomain)', () => {
     'https://www.netflix.com:443/watch/1', 'https://WWW.NETFLIX.COM/watch/1']) assert.ok(H.isSiteUrl(u, hosts), u);
 });
 
+test('watch pages: a player lives there, the browse pages do not count', () => {
+  for (const u of ['https://www.netflix.com/watch/81234567?trackId=1', 'https://www.netflix.com/se/watch/81234567',
+    'https://www.disneyplus.com/play/0a1b2c3d-0000-0000-0000-000000000000', 'https://www.disneyplus.com/video/abc']) assert.ok(H.isWatchUrl(u), u);
+  for (const u of ['https://www.netflix.com/browse', 'https://www.netflix.com/title/81234567', 'https://www.disneyplus.com/home',
+    'https://evil.com/watch/123', 'https://www.youtube.com/watch?v=abc', 'nonsense', '']) assert.ok(!H.isWatchUrl(u), u);
+  const tabs = [{ id: 1, url: 'https://www.netflix.com/watch/1' }, { id: 2, url: 'https://www.netflix.com/browse' }, { id: 3, url: 'https://www.netflix.com/watch/2' }];
+  assert.deepStrictEqual(H.watchTabs(tabs, [3]).map((t) => t.id), [1]);
+  assert.deepStrictEqual(H.watchTabs([], []), []);
+});
+
 test('everything else is refused', () => {
   for (const u of ['http://www.netflix.com/watch/1', // not https
     'https://netflix.com.evil.com/watch/1', 'https://evilnetflix.com/', 'https://notnetflix.com/', // dot boundary
