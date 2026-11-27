@@ -1,0 +1,74 @@
+# Starter kit (Development Doctrine): every pull request runs the tests. A pull request into an integration branch
+# (dev, or any branch ending in -dev) merges itself once the tests pass and it carries the `reviewed` label, which the
+# session adds after its local review; adding the label is what merges. A new push takes the label off. main takes only pull requests the owner merges.
+# No AI reviewer and no API key on GitHub; no Claude attribution in a public repo.
+# Public repos only: in a private repo every job is skipped (a skipped job bills no minutes); see the README for the
+# private merge steps. Don't enable it there.
+name: PR checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled, edited]
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-latest           # windows-latest only if the tests need it (Windows minutes bill x2)
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4     # the extension is plain JavaScript; its tests use Node's own runner
+        with:
+          node-version: "20"
+      - name: Tests
+        run: node --test test/           # no install step: the tests need no packages
+
+  unreview:
+    # New commits after a review: the label comes off at once, so nothing unreviewed can merge.
+    if: >-
+      github.event.repository.private == false &&
+      github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'reviewed')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --remove-label reviewed
+          echo "::notice::New commits since the review: the reviewed label is off. Review again, then add it back."
+
+  merge:
+    needs: tests
+    if: >-
+      github.event.repository.private == false &&
+      github.event.action == 'labeled' && github.event.label.name == 'reviewed' &&
+      (github.base_ref == 'dev' || endsWith(github.base_ref, '-dev')) &&
+      contains(github.event.pull_request.labels.*.name, 'reviewed')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Merge the tested commit, if the pull request still qualifies now
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          TESTED: ${{ github.event.pull_request.head.sha }}
+        run: |
+          read -r base head draft labelled < <(gh pr view "$PR" --repo "$REPO" --json baseRefName,headRefOid,isDraft,labels \
+            --jq '[.baseRefName, .headRefOid, (.isDraft|tostring), ([.labels[].name] | index("reviewed") != null | tostring)] | join(" ")')
+          echo "now: base=$base head=$head draft=$draft reviewed=$labelled; tested=$TESTED"
+          case "$base" in dev|*-dev) ;; *) echo "::notice::base is $base, not an integration branch: not merging"; exit 0;; esac
+          if [ "$draft" != false ] || [ "$labelled" != true ] || [ "$head" != "$TESTED" ]; then
+            echo "::notice::changed since the tests ran: not merging"; exit 0
+          fi
+          gh pr merge "$PR" --repo "$REPO" --merge --match-head-commit "$TESTED"

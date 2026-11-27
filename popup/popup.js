@@ -34,6 +34,7 @@ async function init() {
     setTimeout(queueLoop, 2000);
   })();
   if (await initYoutube()) return;
+  await initSeasonPending(tab);
   try {
     st = await chrome.tabs.sendMessage(tab.id, { type: 'getState' });
   } catch (e) {
@@ -86,7 +87,7 @@ async function init() {
     : `Detected from the player: ${meta.show || '?'} season ${meta.season ?? '?'} episode ${meta.episode ?? '?'}`;
   if (meta && meta.episodes && meta.episodes.length > 1 && st.site === 'netflix') {
     $('seasonBtn').hidden = false;
-    $('seasonBtn').textContent = `Send the whole season (${meta.episodes.length} episodes, experimental)`;
+    $('seasonBtn').textContent = `Plan the whole season (${meta.episodes.length} episodes, experimental)`;
     $('seasonBtn').onclick = () => startSeason(meta);
   }
   if (!i.title) say('The player has not shown the title yet (move the mouse over the video), so check the title here.');
@@ -105,7 +106,9 @@ async function send() {
     const r = await chrome.runtime.sendMessage({ type: 'send', payload });
     if (r.status === 'rejected') say('Surasura did not accept it: ' + r.why, 'bad');
     else if (r.status === 'error') say('Something went wrong: ' + r.why, 'bad');
-    else {
+    else if (r.queueFull) {
+      say('Surasura did not answer and the waiting list here is full, so this subtitle was NOT kept. Start Surasura and send it again.', 'bad');
+    } else {
       const [text, cls] = WORDS[r.status];
       say(`${text}\n(${payload.title}, ${payload.language}, ${cues.length} cues)` + (payload.cover ? '\nCover sent.' : '\nNo cover: ' + ((cv && cv.why) || 'unknown')), cls);
     }
@@ -115,20 +118,16 @@ async function send() {
   $('send').disabled = false;
 }
 
+// probe:start
 $('probe').onclick = () => runProbe(tab, $('probeOut'), $('probe'));
+// probe:end
 init();
 
 async function startSeason(m) {
   const lang = st.tracks.find((t) => t.key === $('track').value).language;
-  const minutes = Math.ceil((m.episodes.length * 25) / 60);
-  if (!confirm(`EXPERIMENTAL. This walks THIS tab through all ${m.episodes.length} episodes of the season, one after another, muted, about 20-30 seconds each (roughly ${minutes} minutes). It sends the ${lang || ''} subtitles of each and then returns to this episode. Keep the tab open; you can Stop from this popup. Continue?`)) return;
-  const { token } = await chrome.storage.local.get('token');
-  const r = await chrome.runtime.sendMessage({
-    type: 'startSeason', tabId: tab.id, token, episodes: m.episodes, language: lang, startId: st.videoId,
-  });
-  if (!r || !r.ok) return say('Could not start: ' + ((r && r.why) || 'no answer'), 'bad');
-  say('The season walk has started: its progress shows above and updates by itself.');
-  if (mining) mining.refresh();
+  // Netflix plays one video at a time: the walk runs in a window of Ukai's own AFTER you have left the player.
+  await chrome.storage.session.set({ season: { show: m.show, language: lang, episodes: m.episodes } });
+  say('Season walk planned (' + m.episodes.length + ' episodes, ' + (lang || '?') + '). Now leave this video (back to the browse page), open Ukai again and press "Start the season walk". Ukai uses a window of its own and never this tab.');
 }
 
 // YouTube: only hands links to Surasura (POST /v1/youtube); nothing is recorded there.

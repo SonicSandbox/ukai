@@ -5,8 +5,8 @@ const D = require('../src/delivery.js');
 test('postDone echoes the lines\' rev when the job had one, and sends none otherwise', async () => {
   const sent = [];
   const fetchFn = async (url, init) => { sent.push(JSON.parse(init.body)); return { status: 200 }; };
-  assert.strictEqual(await D.postDone('t', 7, [{ n: 1, why: 'x' }], fetchFn, 3), true);
-  await D.postDone('t', 7, [], fetchFn, undefined);
+  assert.strictEqual(await D.postDone('t', 7, [{ n: 1, why: 'x' }], fetchFn, undefined, undefined, 3), true);
+  await D.postDone('t', 7, [], fetchFn, undefined, undefined, undefined);
   assert.deepStrictEqual(sent, [{ failed: [{ n: 1, why: 'x' }], rev: 3 }, { failed: [] }]);
 });
 
@@ -68,6 +68,60 @@ test('401 is queued, 400 is not, 503 is busy', async () => {
   assert.strictEqual((await D.deliver(payload, d3)).status, 'busy');
 });
 
+// ---- the waiting list is capped in bytes ----
+const big = (id, chars, cover) => {
+  const p = { schema: 1, site: 'netflix', video_id: id, language: 'ja', title: 't', cues: [[0, 1, 'あ'.repeat(chars)]] };
+  if (cover) p.cover = cover;
+  return p;
+};
+
+test('byteSize counts UTF-8 bytes, not characters', () => {
+  assert.strictEqual(D.byteSize('あ'), 5); // 3 bytes + 2 quotes
+  assert.ok(D.byteSize(big('1', 1000)) > 3000);
+});
+
+test('fitQueue: under the cap everything stays, same episode is replaced', () => {
+  const q = [big('1', 10), big('2', 10)];
+  const r = D.fitQueue(q, big('2', 20), 100000);
+  assert.deepStrictEqual(r.queue.map((p) => p.video_id), ['1', '2']);
+  assert.strictEqual(r.queue[1].cues[0][2].length, 20);
+  assert.strictEqual(r.refused, false);
+});
+
+test('fitQueue: at the edge the artwork goes first, and nothing waiting is dropped', () => {
+  const cover = 'A'.repeat(2000);
+  const a = big('1', 100, cover), b = big('2', 100, cover);
+  const withCovers = D.byteSize([a, b]);
+  const without = D.byteSize([big('1', 100), big('2', 100)]);
+  // exactly fits: kept untouched
+  let r = D.fitQueue([a], b, withCovers);
+  assert.strictEqual(r.refused, false); assert.strictEqual(r.coversDropped, 0);
+  // one byte short: covers are dropped, both subtitles stay
+  r = D.fitQueue([a], b, withCovers - 1);
+  assert.strictEqual(r.refused, false);
+  assert.strictEqual(r.queue.length, 2);
+  assert.ok(r.coversDropped >= 1);
+  assert.ok(D.byteSize(r.queue) <= withCovers - 1);
+  // the waiting one loses its cover before the incoming one does
+  assert.ok(!r.queue[0].cover);
+  // even without any artwork it does not fit: the NEW one is refused, the old stay
+  r = D.fitQueue([a], b, without - 1);
+  assert.strictEqual(r.refused, true);
+  assert.deepStrictEqual(r.queue.map((p) => p.video_id), ['1']);
+});
+
+test('deliver: a full list says so (queueFull) and keeps what waits; a rejected storage.set is the same', async () => {
+  const d = mkDeps(fakeFetch(() => new Error('refused')));
+  d.mem.queue = [big('1', 100)];
+  const r = await D.deliver(big('2', 100), d, D.byteSize([big('1', 100)]) + 10);
+  assert.strictEqual(r.status, 'offline'); assert.strictEqual(r.queued, false); assert.strictEqual(r.queueFull, true);
+  assert.deepStrictEqual(d.mem.queue.map((p) => p.video_id), ['1']);
+  const d2 = mkDeps(fakeFetch(() => new Error('refused')));
+  d2.storage.set = async () => { throw new Error('QUOTA_BYTES quota exceeded'); };
+  const r2 = await D.deliver(big('3', 5), d2);
+  assert.strictEqual(r2.queueFull, true);
+});
+
 test('buildPayload: film has no show, season/episode optional, query stripped', () => {
   const st = { site: 'disneyplus', videoId: 'v', url: 'https://x/play/v?a=1#b', docTitle: 'Doc' };
   const p = D.buildPayload(st, { language: null }, [], { title: '', show: '', season: '', episode: '' });
@@ -77,4 +131,35 @@ test('buildPayload: film has no show, season/episode optional, query stripped', 
   assert.strictEqual(p.url, 'https://x/play/v');
   const q = D.buildPayload(st, { language: 'ja' }, [], { title: 'T', show: 'S', season: '', episode: '4' });
   assert.deepStrictEqual(q.show, { title: 'S', episode: 4 });
+});
+
+test('v2 posts: a busy (503) Surasura is tried again before giving up; a missing job is not retried', async () => {
+  const sleeps = [];
+  const sleep = async (ms) => { sleeps.push(ms); };
+  let n = 0;
+  const busyTwice = async () => ({ status: ++n <= 2 ? 503 : 200 });
+  assert.strictEqual(await D.postDone('t', 7, [], busyTwice, sleep), true);
+  assert.strictEqual(sleeps.reduce((a, b) => a + b, 0), 7000); // 2 s + 5 s, waited in half-second steps
+  assert.ok(D.WAITS.reduce((a, b) => a + b, 0) >= 150000, 'patient for at least 2 1/2 minutes');
+  n = 0; sleeps.length = 0;
+  assert.strictEqual(await D.postClip('t', 7, 0, new Blob(['x']), 1, 2, busyTwice, sleep), 'ok');
+  let calls = 0;
+  const always503 = async () => { calls++; return { status: 503 }; };
+  assert.strictEqual(await D.postDone('t', 7, [], always503, sleep), false);
+  assert.strictEqual(calls, D.WAITS.length + 1);
+  calls = 0;
+  assert.strictEqual(await D.postClip('t', 7, 0, new Blob(['x']), 1, 2, async () => { calls++; return { status: 404 }; }, sleep), 'gone');
+  assert.strictEqual(calls, 1);
+  assert.strictEqual(await D.postClip('t', 7, 0, new Blob(['x']), 1, 2, async () => { throw new Error('down'); }, sleep), 'abort');
+});
+
+test('a Stop is noticed during the busy waits (within half a second), not after minutes', async () => {
+  let stop = false, slept = 0, calls = 0;
+  const sleep = async (ms) => { slept += ms; if (slept >= 1000) stop = true; };
+  const r = await D.postClip('t', 7, 0, new Blob(['x']), 1, 2, async () => { calls++; return { status: 503 }; }, sleep, () => stop);
+  assert.strictEqual(r, 'abort');
+  assert.strictEqual(calls, 1);
+  assert.ok(slept <= 1500, 'slept ' + slept);
+  stop = false; slept = 0;
+  assert.strictEqual(await D.postDone('t', 7, [], async () => ({ status: 503 }), async () => { stop = true; }, () => stop), false);
 });
