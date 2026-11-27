@@ -176,10 +176,13 @@
     }
   }
 
-  async function postDone(token, job, failed, fetchFn, sleep, shouldStop) {
+  // `rev`: the job's lines' revision as GET /v1/jobs listed it (echoed so a `done` for an older set of lines never
+  // closes lines Surasura added since; Surasura without it keeps the job open until every line has a clip or failed)
+  async function postDone(token, job, failed, fetchFn, sleep, shouldStop, rev) {
     try {
+      const body = Number.isInteger(rev) ? { failed, rev } : { failed };
       const r = await fetchRetry(fetchFn, BASE + '/v1/jobs/' + job + '/done', {
-        method: 'POST', headers: hdr(token, { 'Content-Type': 'application/json' }), body: JSON.stringify({ failed }),
+        method: 'POST', headers: hdr(token, { 'Content-Type': 'application/json' }), body: JSON.stringify(body),
       }, sleep, shouldStop);
       if (r.status !== 200) console.log('[surasura] done of job ' + job + ': HTTP ' + r.status);
       return r.status === 200;

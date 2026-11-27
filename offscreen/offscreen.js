@@ -91,7 +91,7 @@ async function startBatch(m) {
       recorder,
       api: {
         postClip: (job, n, blob, s, e) => D.postClip(m.token, job.job, n, blob, s, e, fetch, undefined, () => stopFlag),
-        postDone: (job, failed) => D.postDone(m.token, job.job, failed, fetch, undefined, () => stopFlag),
+        postDone: (job, failed) => D.postDone(m.token, job.job, failed, fetch, undefined, () => stopFlag, job.rev),
       },
     };
     const r = await W.runBatch(m.jobs, env);

@@ -58,8 +58,13 @@ recorded), `X-Clip-End: <seconds>`.
 → `200 {"ok": true}` · `404` no such job or line (dropped meanwhile: skip it) · `413` too large · `401` · `503` busy.
 
 ## POST /v1/jobs/<job>/done
-Body: `{"failed": [{"n": 1, "why": "seek failed"}]}` (empty list when every line was recorded).
+Body: `{"failed": [{"n": 1, "why": "seek failed"}], "rev": 2}` (`failed` empty when every line was recorded).
 → `200 {"ok": true}`. Surasura makes the cards from the clips it has; a failed line is said plainly on the job.
+`rev` (optional): the job's `rev` as `GET /v1/jobs` listed it. Surasura may add lines to a waiting job (a new pick);
+each addition raises `rev`. A `done` whose `rev` is older closes only the lines it knew: the job stays listed with the
+new lines. Without `rev` Surasura closes the job only once every line has a clip or is in `failed`.
+
+`GET /v1/jobs` lists each job's `"rev": <int>` beside its `lines`.
 
 ## Optional in v1's POST /v1/online-subtitle
 `"cover": "<base64 JPEG or PNG, at most 400 KB>"` — the show's artwork as the page shows it. Surasura may ignore it.
