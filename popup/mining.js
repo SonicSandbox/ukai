@@ -39,13 +39,9 @@ async function initMining(tab, st) {
     if (bs && bs.state === 'finished') parts.push(el('p', describe(bs.result), { className: 'ok' }));
     if (j.status === 'badtoken') {
       // never hidden: a token Surasura no longer knows would leave episodes waiting with nothing said
+      if (self.ukaiPair) self.ukaiPair.need(); // the Connect box at the top asks again
       parts.push(el('h3', 'Mining'));
-      parts.push(el('p', 'Surasura doesn\'t know this extension\'s token. In Surasura\'s settings, press *Copy token* ' +
-        '(Browser extension) and paste it into this extension\'s options. This box updates by itself.',
-        { className: 'bad' }));
-      const b = el('button', 'Open options');
-      b.onclick = () => chrome.runtime.openOptionsPage();
-      parts.push(b);
+      parts.push(el('p', 'Surasura doesn\'t know this extension. Press Connect at the top of this window.', { className: 'bad' }));
       return say(parts, key);
     }
     if (j.status !== 'ok' || !j.jobs.length) {

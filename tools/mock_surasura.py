@@ -31,7 +31,17 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    pair_looks = 0
+    PAIR_LOOKS = 4
+
     def do_GET(self):
+        if self.path.startswith("/v1/pair/"):
+            if self.path != "/v1/pair/mockmockmockmockmock12":
+                return self._send(404, {"ok": False, "kind": "gone"})
+            Handler.pair_looks += 1
+            if Handler.pair_looks < self.PAIR_LOOKS:
+                return self._send(200, {"state": "waiting"})
+            return self._send(200, {"state": "allowed", "token": self.token})
         if self.path == "/v1/jobs":
             if self.headers.get("X-Surasura-Token") != self.token:
                 return self._send(401, {"ok": False})
@@ -105,6 +115,10 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, {"ok": True, "queued": len(urls)})
 
     def do_POST(self):
+        if self.path == "/v1/pair":  # mimics Surasura's pairing: the "Allow" comes after PAIR_LOOKS looks
+            self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            Handler.pair_looks = 0
+            return self._send(200, {"pair": "mockmockmockmockmock12", "code": "4821", "wait_s": 600})
         if self.path == "/v1/youtube":
             return self._youtube()
         if self.path.startswith("/v1/jobs/"):

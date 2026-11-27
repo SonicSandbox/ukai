@@ -7,7 +7,7 @@ const WORDS = {
   exists: ['Already in your Surasura library.', 'ok'],
   offline: ['Surasura is not running. Kept here; it will be sent when Surasura starts.', 'bad'],
   busy: ['Surasura is busy. Kept here; it will be sent again soon.', 'bad'],
-  badtoken: ['Wrong or missing token. Paste the token from Surasura in "Token / settings". Kept here until it works.', 'bad'],
+  badtoken: ['Not connected to Surasura yet. Press Connect above. Kept here until it works.', 'bad'],
 };
 
 // false once the extension is reloaded or removed under an open popup (its calls would throw "context invalidated")
@@ -23,13 +23,12 @@ function say(text, cls) {
 async function init() {
   $('opts').onclick = (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); };
   [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  let warned = false;
+  self.ukaiPair = initPair();
   (async function queueLoop() { // the queue's line follows the background while the popup is open
     if (!alive()) return; // the extension was reloaded under this popup: nothing left to ask
     try {
       const s = await chrome.runtime.sendMessage({ type: 'status' }).catch(() => null);
       $('queue').textContent = s && s.queued ? `${s.queued} subtitle(s) waiting for Surasura.` : '';
-      if (s && !s.hasToken && !warned) { warned = true; say('No token yet. Open "Token / settings" and paste the one from Surasura.', 'bad'); }
     } catch (e) { /* the next look tries again */ }
     setTimeout(queueLoop, 2000);
   })();
@@ -106,7 +105,10 @@ async function send() {
     const r = await chrome.runtime.sendMessage({ type: 'send', payload });
     if (r.status === 'rejected') say('Surasura did not accept it: ' + r.why, 'bad');
     else if (r.status === 'error') say('Something went wrong: ' + r.why, 'bad');
-    else if (r.queueFull) {
+    else if (r.status === 'badtoken' && !r.queueFull) {
+      self.ukaiPair.need();
+      say(WORDS.badtoken[0], 'bad');
+    } else if (r.queueFull) {
       say('Surasura did not answer and the waiting list here is full, so this subtitle was NOT kept. Start Surasura and send it again.', 'bad');
     } else {
       const [text, cls] = WORDS[r.status];
@@ -150,9 +152,10 @@ async function initYoutube() {
         refused: ['Surasura says: ' + r.why, 'bad'],
         offline: ['Surasura is not running.', 'bad'],
         busy: ['Surasura is busy. Try again in a moment.', 'bad'],
-        badtoken: ['Wrong or missing token (Token / settings).', 'bad'],
+        badtoken: ['Not connected to Surasura. Press Connect above.', 'bad'],
         rejected: ['Surasura did not accept it: ' + r.why, 'bad'],
       }[r.status];
+      if (r.status === 'badtoken') self.ukaiPair.need();
       say(words[0], words[1]);
       b.disabled = false;
     };

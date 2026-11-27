@@ -22,7 +22,8 @@ body { font: 13px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-ser
 .brand span { color: var(--ink-faint); font-size: 12px; margin-left: auto; }
 
 .page { padding: 10px 12px 12px; }
-section, #mining, #yt { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+.code { font-size: 28px; font-weight: 600; letter-spacing: 6px; color: var(--accent); margin: 6px 0; }
+section, #mining, #yt, #pair { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
   padding: 10px 12px; margin: 0 0 10px; }
 h2, h3 { margin: 0 0 6px; font-weight: 600; color: var(--ink); }
 h2 { font-size: 16px; } h3 { font-size: 13px; }
