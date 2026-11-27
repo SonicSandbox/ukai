@@ -13,6 +13,45 @@
     }
   }
 
+  // Pairing (Surasura's one-Allow flow): ask, show the code, then look every second until the learner answers there.
+  // -> {status: 'asked', pair, code} | offline | busy (another extension is being asked, or Surasura is busy) |
+  //    unsupported (this Surasura has no pairing) | rejected
+  async function pairAsk(version, fetchFn) {
+    let r;
+    try {
+      r = await fetchFn(BASE + '/v1/pair', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: version || '' }),
+      });
+    } catch (e) {
+      return { status: 'offline' };
+    }
+    let j = null;
+    try { j = await r.json(); } catch (e) { /* ignore */ }
+    if (r.status === 200 && j && typeof j.pair === 'string' && j.code != null) return { status: 'asked', pair: j.pair, code: String(j.code) };
+    if (r.status === 404) return { status: 'unsupported' };
+    if (r.status === 409 || r.status >= 500) return { status: 'busy', why: j && j.why };
+    return { status: 'rejected', why: (j && j.why) || 'HTTP ' + r.status };
+  }
+
+  // -> {status: 'waiting' | 'denied' | 'gone' | 'offline' | 'busy' | 'rejected'} | {status: 'allowed', token}
+  // (the token comes once: the caller keeps it before anything else)
+  async function pairClaim(pair, fetchFn) {
+    let r;
+    try {
+      r = await fetchFn(BASE + '/v1/pair/' + encodeURIComponent(pair), { cache: 'no-store' });
+    } catch (e) {
+      return { status: 'offline' };
+    }
+    let j = null;
+    try { j = await r.json(); } catch (e) { /* ignore */ }
+    if (r.status === 404) return { status: 'gone' };
+    if (r.status >= 500) return { status: 'busy' };
+    if (r.status !== 200 || !j) return { status: 'rejected', why: (j && j.why) || 'HTTP ' + r.status };
+    if (j.state === 'allowed') return typeof j.token === 'string' && j.token ? { status: 'allowed', token: j.token } : { status: 'rejected', why: 'no token' };
+    if (j.state === 'denied') return { status: 'denied' };
+    return { status: 'waiting' };
+  }
+
   // -> {status: added|exists|offline|busy|badtoken|rejected, why?, item?}
   async function post(payload, token, fetchFn) {
     let r;
@@ -203,7 +242,7 @@
     return { status: 'rejected', why: (j && j.why) || 'HTTP ' + r.status };
   }
 
-  const api = { WAITS, BASE, hello, post, deliver, flush, keyOf, fitQueue, byteSize, MAX_QUEUE_BYTES, buildPayload, getJobs, postClip, postDone, postYoutube };
+  const api = { WAITS, BASE, hello, pairAsk, pairClaim, post, deliver, flush, keyOf, fitQueue, byteSize, MAX_QUEUE_BYTES, buildPayload, getJobs, postClip, postDone, postYoutube };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SurasuraDelivery = api;
 })(typeof self !== 'undefined' ? self : globalThis);
