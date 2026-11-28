@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Ukai 鵜飼 · for Surasura",
+  "name": "鵜 Ukai",
   "version": "0.2.0",
   "description": "Ukai, Surasura's watch companion: brings the subtitles and the clips of what you watch on Netflix, Disney+ and YouTube home to your local Surasura.",
   "minimum_chrome_version": "111",
