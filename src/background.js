@@ -68,7 +68,7 @@ async function quietUntilReady(tabId) {
   }
 }
 
-const OWN = new Set(['openOwn', 'startSeasonOwn', 'tabAlive', 'ownReady', 'closeWindow', 'content', 'startSeason', 'send', 'status', 'startBatch', 'page', 'navigate', 'closeTab']);
+const OWN = new Set(['muteTab', 'openOwn', 'startSeasonOwn', 'tabAlive', 'ownReady', 'closeWindow', 'content', 'startSeason', 'send', 'status', 'startBatch', 'page', 'navigate', 'closeTab']);
 
 chrome.runtime.onMessage.addListener((m, _s, reply) => {
   if (!m || (m.to && m.to !== 'background') || !OWN.has(m.type)) return false; // not for us: let others answer
@@ -132,6 +132,10 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
         await chrome.tabs.update(m.tabId, { muted: false }).catch(() => {});
         if (MINIMIZE) await chrome.windows.update(m.windowId, { state: 'minimized' }).catch(() => {});
         else await chrome.windows.update(m.windowId, { width: 480, height: 320 }).catch(() => {});
+        return { ok: true };
+      }
+      case 'muteTab': { // the capture is ending: the tab's sound would come back to the speakers
+        await chrome.tabs.update(m.tabId, { muted: !!m.on }).catch(() => {});
         return { ok: true };
       }
       case 'closeWindow': {

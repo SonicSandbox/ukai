@@ -69,7 +69,9 @@ async function startBatch(m) {
         });
       },
     };
-    // the capture is live: un-mute the window's tab (the capture keeps its sound from the speakers) and minimize it
+    // the capture ending on its own (the window or tab closed, the capture stopped): mute the tab again at once
+    if (m.windowId) stream.getTracks().forEach((t) => { t.onended = () => relay({ type: 'muteTab', tabId: m.tabId, on: true }).catch(() => {}); });
+    // the capture is live: un-mute the window's tab (the capture keeps its sound from the speakers) and make the window small
     if (m.windowId) await relay({ type: 'ownReady', tabId: m.tabId, windowId: m.windowId });
     const page = async (op, args) => {
       const r = await relay({ type: 'page', tabId: m.tabId, op, args });
@@ -101,6 +103,8 @@ async function startBatch(m) {
     log('batch failed:', e);
     status = { state: 'finished', result: { status: 'error', message: String((e && e.message) || e), results: [] } };
   } finally {
+    // mute first: once the tracks stop, the tab's sound would come back to the speakers
+    if (m.windowId) await relay({ type: 'muteTab', tabId: m.tabId, on: true }).catch(() => {});
     if (stream) stream.getTracks().forEach((t) => t.stop());
     if (ctx) ctx.close();
     if (m.windowId) relay({ type: 'closeWindow', windowId: m.windowId });
