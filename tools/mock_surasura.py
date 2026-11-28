@@ -44,7 +44,7 @@ class Handler(BaseHTTPRequestHandler):
                 jobs.append(dict(j["job"], lines=[l for l in j["job"]["lines"] if l["n"] in j["missing"]]))
             return self._send(200, {"jobs": jobs})
         if self.path == "/v1/hello":
-            self._send(200, {"app": "surasura", "version": "0.0.0-mock", "contract": 2, "languages": ["ja", "zh"]})
+            self._send(200, {"app": "surasura", "version": "0.0.0-mock", "contract": 2, "languages": ["ja", "zh"], "covers": True})
         else:
             self._send(404, {"ok": False, "why": "not found"})
 
