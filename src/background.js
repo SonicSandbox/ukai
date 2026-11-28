@@ -122,6 +122,7 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
           await chrome.windows.remove(w.windowId).catch(() => {}); // refused: do not leave the window open
           return { ok: false, why: (r && r.why) || 'no answer' };
         }
+        await chrome.storage.session.remove('season'); // the plan is spent once the walk runs (the popup is gone by now)
         return { ok: true };
       }
       case 'tabAlive': {
