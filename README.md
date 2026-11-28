@@ -2,7 +2,7 @@
 
 <img src="icons/icon-512.png" width="96" height="96" alt="Ukai">
 
-# Ukai 鵜飼
+# 鵜 Ukai
 
 ![Chrome · Edge](https://img.shields.io/badge/Chrome%20%C2%B7%20Edge-extension-f5b73b) ![Manifest V3](https://img.shields.io/badge/Manifest-V3-a06818) ![Local only](https://img.shields.io/badge/sends%20only%20to-127.0.0.1-03dac6) ![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg) [![Works with Surasura](https://img.shields.io/badge/works%20with-Surasura-22c3c9)](https://github.com/SonicSandbox/surasura)
 
