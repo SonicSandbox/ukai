@@ -117,6 +117,8 @@ async function startSeason(m) {
     return r;
   };
   const page = async (op, args) => (await ask({ type: 'player', op, args })).result;
+  const hi = await D.hello(fetch); // artwork only when Surasura says its cover download is on
+  const covers = !!(hi && hi.covers === true);
   const env = {
     now: () => Date.now(),
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
@@ -127,7 +129,7 @@ async function startSeason(m) {
     getState: () => ask({ type: 'getState' }),
     getCues: (key) => ask({ type: 'getCues', key }),
     getMeta: async () => (await ask({ type: 'getMeta' })).meta,
-    getCover: async () => (await ask({ type: 'getCover' })).cover,
+    getCover: async () => (covers ? (await ask({ type: 'getCover' })).cover : null),
     play: () => page('play'), pause: () => page('pause').catch(() => {}), mute: (on) => page('mute', { on }),
     playerReady: async () => { const s = await page('state'); return s && s.ok && s.apiReady && s.readyState >= 2; },
     build: (st, track, cues, meta, cover) => D.buildPayload(st, track, cues,

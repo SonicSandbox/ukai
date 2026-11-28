@@ -99,7 +99,11 @@ async function send() {
   try {
     const track = st.tracks.find((t) => t.key === $('track').value);
     const { cues } = await chrome.tabs.sendMessage(tab.id, { type: 'getCues', key: track.key });
-    const cv = await chrome.tabs.sendMessage(tab.id, { type: 'getCover' }).catch(() => null);
+    // artwork only when Surasura's hello says its cover download is on (offline: none, a late cover is not worth a fetch)
+    const hi = await D.hello(fetch);
+    const cv = hi && hi.covers === true
+      ? await chrome.tabs.sendMessage(tab.id, { type: 'getCover' }).catch(() => null)
+      : { cover: null, why: hi ? 'Surasura\'s cover download is off' : 'Surasura did not answer' };
     const payload = D.buildPayload(st, track, cues, {
       title: $('title').value, show: $('show').value, season: $('season').value, episode: $('episode').value,
     }, cv && cv.cover);
