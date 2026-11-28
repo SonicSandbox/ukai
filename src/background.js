@@ -1,4 +1,4 @@
-importScripts('delivery.js', 'hosts.js');
+importScripts('debug.js', 'delivery.js', 'hosts.js');
 const D = self.SurasuraDelivery;
 const H = self.SurasuraHosts;
 const deps = {
@@ -76,7 +76,7 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
     switch (m.type) {
       case 'send': {
         const r = await D.deliver(m.payload, deps);
-        console.log('[surasura] send ->', r.status, r.queued ? '(queued)' : '', r.why || '');
+        globalThis.UKAI_DEBUG && console.log('[surasura] send ->', r.status, r.queued ? '(queued)' : '', r.why || '');
         return r;
       }
       case 'status': {
@@ -149,6 +149,6 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
 
 chrome.alarms.create('flush', { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener((a) => {
-  if (a.name === 'flush') D.flush(deps).then((r) => r.sent && console.log('[surasura] delivered queued subtitles:', r.sent));
+  if (a.name === 'flush') D.flush(deps).then((r) => r.sent && globalThis.UKAI_DEBUG && console.log('[surasura] delivered queued subtitles:', r.sent));
 });
 chrome.runtime.onStartup.addListener(() => D.flush(deps));

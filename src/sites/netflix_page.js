@@ -29,5 +29,5 @@
       return document.querySelector('[data-uia="interrupt-autoplay-paused"]') ? 'are-you-still-watching' : null;
     },
   };
-  console.log('[surasura] netflix page player ready');
+  globalThis.UKAI_DEBUG && console.log('[surasura] netflix page player ready');
 })();

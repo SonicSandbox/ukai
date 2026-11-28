@@ -44,6 +44,7 @@
         "*://*.netflix.com/*"
       ],
       "js": [
+        "src/debug.js",
         "src/hook.js",
         "src/meta.js",
         "src/sites/netflix_page.js",
@@ -58,6 +59,7 @@
         "*://*.netflix.com/*"
       ],
       "js": [
+        "src/debug.js",
         "src/parsers.js",
         "src/sites/netflix.js",
         "src/content.js"
@@ -69,6 +71,7 @@
         "*://*.disneyplus.com/*"
       ],
       "js": [
+        "src/debug.js",
         "src/hook.js",
         "src/sites/disneyplus_page.js",
         "src/isolate.js",
@@ -82,6 +85,7 @@
         "*://*.disneyplus.com/*"
       ],
       "js": [
+        "src/debug.js",
         "src/parsers.js",
         "src/sites/disneyplus.js",
         "src/content.js"
