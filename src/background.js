@@ -84,6 +84,9 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
         return Object.assign(await status(), { flushed: f.sent, running: !!(await D.hello(deps.fetch)) });
       }
       case 'startBatch': {
+        // only a tab Ukai opened itself may be recorded (never the learner's own)
+        const { own } = await chrome.storage.session.get('own');
+        if (!own || !Object.prototype.hasOwnProperty.call(own, m.tabId)) return { ok: false, why: 'This is not a tab Ukai opened. Ukai records only in its own window.' };
         await ensureOffscreen();
         return chrome.runtime.sendMessage(Object.assign({}, m, { to: 'offscreen', type: 'start' }));
       }
