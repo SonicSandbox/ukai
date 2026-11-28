@@ -1,4 +1,4 @@
-importScripts('delivery.js', 'hosts.js');
+importScripts('debug.js', 'delivery.js', 'hosts.js');
 const D = self.SurasuraDelivery;
 const H = self.SurasuraHosts;
 const deps = {
@@ -68,7 +68,7 @@ async function quietUntilReady(tabId) {
   }
 }
 
-const OWN = new Set(['openOwn', 'startSeasonOwn', 'tabAlive', 'ownReady', 'closeWindow', 'content', 'startSeason', 'send', 'status', 'startBatch', 'page', 'navigate', 'closeTab']);
+const OWN = new Set(['muteTab', 'openOwn', 'startSeasonOwn', 'tabAlive', 'ownReady', 'closeWindow', 'content', 'startSeason', 'send', 'status', 'startBatch', 'page', 'navigate', 'closeTab']);
 
 chrome.runtime.onMessage.addListener((m, _s, reply) => {
   if (!m || (m.to && m.to !== 'background') || !OWN.has(m.type)) return false; // not for us: let others answer
@@ -76,7 +76,7 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
     switch (m.type) {
       case 'send': {
         const r = await D.deliver(m.payload, deps);
-        console.log('[surasura] send ->', r.status, r.queued ? '(queued)' : '', r.why || '');
+        globalThis.UKAI_DEBUG && console.log('[surasura] send ->', r.status, r.queued ? '(queued)' : '', r.why || '');
         return r;
       }
       case 'status': {
@@ -84,6 +84,9 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
         return Object.assign(await status(), { flushed: f.sent, running: !!(await D.hello(deps.fetch)) });
       }
       case 'startBatch': {
+        // only a tab Ukai opened itself may be recorded (never the learner's own)
+        const { own } = await chrome.storage.session.get('own');
+        if (!own || !Object.prototype.hasOwnProperty.call(own, m.tabId)) return { ok: false, why: 'This is not a tab Ukai opened. Ukai records only in its own window.' };
         await ensureOffscreen();
         return chrome.runtime.sendMessage(Object.assign({}, m, { to: 'offscreen', type: 'start' }));
       }
@@ -122,6 +125,7 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
           await chrome.windows.remove(w.windowId).catch(() => {}); // refused: do not leave the window open
           return { ok: false, why: (r && r.why) || 'no answer' };
         }
+        await chrome.storage.session.remove('season'); // the plan is spent once the walk runs (the popup is gone by now)
         return { ok: true };
       }
       case 'tabAlive': {
@@ -132,6 +136,10 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
         await chrome.tabs.update(m.tabId, { muted: false }).catch(() => {});
         if (MINIMIZE) await chrome.windows.update(m.windowId, { state: 'minimized' }).catch(() => {});
         else await chrome.windows.update(m.windowId, { width: 480, height: 320 }).catch(() => {});
+        return { ok: true };
+      }
+      case 'muteTab': { // the capture is ending: the tab's sound would come back to the speakers
+        await chrome.tabs.update(m.tabId, { muted: !!m.on }).catch(() => {});
         return { ok: true };
       }
       case 'closeWindow': {
@@ -149,6 +157,6 @@ chrome.runtime.onMessage.addListener((m, _s, reply) => {
 
 chrome.alarms.create('flush', { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener((a) => {
-  if (a.name === 'flush') D.flush(deps).then((r) => r.sent && console.log('[surasura] delivered queued subtitles:', r.sent));
+  if (a.name === 'flush') D.flush(deps).then((r) => r.sent && globalThis.UKAI_DEBUG && console.log('[surasura] delivered queued subtitles:', r.sent));
 });
 chrome.runtime.onStartup.addListener(() => D.flush(deps));

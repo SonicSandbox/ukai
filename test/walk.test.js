@@ -190,3 +190,23 @@ test('a Stop during the busy retries ends the batch as stopped, not aborted', as
   assert.strictEqual(r.status, 'stopped');
   assert.strictEqual(w.done.length, 0);
 });
+
+test('the capture ending as the next episode opens: its autoplay is paused, nothing is posted for it, needs-click', async () => {
+  const w = world();
+  w.env.streamAlive = () => !w.url.includes('V2'); // the capture dies when the page changes
+  w.env.navigate = async (u) => { w.url = u; w.t = 0; w.playing = true; }; // Netflix autoplays the new episode
+  const jobs = [job(1, [[0, 10, 12]]), job(2, [[0, 10, 12]], { video_id: 'V2', url: 'https://x/watch/V2' })];
+  const r = await W.runBatch(jobs, w.env);
+  assert.strictEqual(r.status, 'needs-click');
+  assert.strictEqual(w.playing, false, 'the autoplaying episode was paused');
+  assert.deepStrictEqual(w.done.map((d) => d.job), [1], 'no done for job 2');
+  assert.strictEqual(w.clips.length, 1);
+});
+
+test('a Stop during the LAST done is a Stop, not an abort (the clips stay, the line says stopped)', async () => {
+  const w = world();
+  w.env.api.postDone = async () => { w.stopAfter = 0; return false; }; // Stop pressed while done is retrying
+  const r = await W.runBatch([job(1, [[0, 10, 12]])], w.env);
+  assert.strictEqual(w.clips.length, 1, 'the line was recorded first');
+  assert.strictEqual(r.status, 'stopped');
+});

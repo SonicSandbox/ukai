@@ -2,7 +2,7 @@
 // Records the tab's picture + sound (tabCapture stream) one clip per line and posts it to Surasura.
 const D = self.SurasuraDelivery;
 const W = self.SurasuraWalk;
-const log = (...a) => console.log('[surasura]', ...a);
+const log = (...a) => globalThis.UKAI_DEBUG && console.log('[surasura]', ...a);
 
 let status = { state: 'idle' };
 let stopFlag = false;
@@ -69,7 +69,9 @@ async function startBatch(m) {
         });
       },
     };
-    // the capture is live: un-mute the window's tab (the capture keeps its sound from the speakers) and minimize it
+    // the capture ending on its own (the window or tab closed, the capture stopped): mute the tab again at once
+    if (m.windowId) stream.getTracks().forEach((t) => { t.onended = () => relay({ type: 'muteTab', tabId: m.tabId, on: true }).catch(() => {}); });
+    // the capture is live: un-mute the window's tab (the capture keeps its sound from the speakers) and make the window small
     if (m.windowId) await relay({ type: 'ownReady', tabId: m.tabId, windowId: m.windowId });
     const page = async (op, args) => {
       const r = await relay({ type: 'page', tabId: m.tabId, op, args });
@@ -101,6 +103,8 @@ async function startBatch(m) {
     log('batch failed:', e);
     status = { state: 'finished', result: { status: 'error', message: String((e && e.message) || e), results: [] } };
   } finally {
+    // mute first: once the tracks stop, the tab's sound would come back to the speakers
+    if (m.windowId) await relay({ type: 'muteTab', tabId: m.tabId, on: true }).catch(() => {});
     if (stream) stream.getTracks().forEach((t) => t.stop());
     if (ctx) ctx.close();
     if (m.windowId) relay({ type: 'closeWindow', windowId: m.windowId });
@@ -117,6 +121,8 @@ async function startSeason(m) {
     return r;
   };
   const page = async (op, args) => (await ask({ type: 'player', op, args })).result;
+  const hi = await D.hello(fetch); // artwork only when Surasura says its cover download is on
+  const covers = !!(hi && hi.covers === true);
   const env = {
     now: () => Date.now(),
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
@@ -127,7 +133,7 @@ async function startSeason(m) {
     getState: () => ask({ type: 'getState' }),
     getCues: (key) => ask({ type: 'getCues', key }),
     getMeta: async () => (await ask({ type: 'getMeta' })).meta,
-    getCover: async () => (await ask({ type: 'getCover' })).cover,
+    getCover: async () => (covers ? (await ask({ type: 'getCover' })).cover : null),
     play: () => page('play'), pause: () => page('pause').catch(() => {}), mute: (on) => page('mute', { on }),
     playerReady: async () => { const s = await page('state'); return s && s.ok && s.apiReady && s.readyState >= 2; },
     build: (st, track, cues, meta, cover) => D.buildPayload(st, track, cues,

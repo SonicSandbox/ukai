@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Ukai 鵜飼 · for Surasura",
+  "name": "鵜 Ukai",
   "version": "0.2.0",
   "description": "Ukai, Surasura's watch companion: brings the subtitles and the clips of what you watch on Netflix, Disney+ and YouTube home to your local Surasura.",
   "minimum_chrome_version": "111",
@@ -44,6 +44,7 @@
         "*://*.netflix.com/*"
       ],
       "js": [
+        "src/debug.js",
         "src/hook.js",
         "src/meta.js",
         "src/sites/netflix_page.js",
@@ -58,6 +59,7 @@
         "*://*.netflix.com/*"
       ],
       "js": [
+        "src/debug.js",
         "src/parsers.js",
         "src/sites/netflix.js",
         "src/content.js"
@@ -69,6 +71,7 @@
         "*://*.disneyplus.com/*"
       ],
       "js": [
+        "src/debug.js",
         "src/hook.js",
         "src/sites/disneyplus_page.js",
         "src/isolate.js",
@@ -82,6 +85,7 @@
         "*://*.disneyplus.com/*"
       ],
       "js": [
+        "src/debug.js",
         "src/parsers.js",
         "src/sites/disneyplus.js",
         "src/content.js"

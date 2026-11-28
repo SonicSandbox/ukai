@@ -11,5 +11,5 @@
     pause() { const v = video(); if (v) v.pause(); },
     blocker() { return null; },
   };
-  console.log('[surasura] disneyplus page player ready');
+  globalThis.UKAI_DEBUG && console.log('[surasura] disneyplus page player ready');
 })();

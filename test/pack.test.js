@@ -60,3 +60,10 @@ test('the zip is a valid archive: entries inflate back to the staged bytes', () 
   }
   assert.strictEqual(seen.size, files.size);
 });
+
+test('the store build has the console logs off; the source has them on', () => {
+  const fs = require('node:fs');
+  const files = stage(path.join(__dirname, '..'));
+  assert.match(files.get('src/debug.js').toString('utf8'), /self\.UKAI_DEBUG = false;/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'src', 'debug.js'), 'utf8'), /self\.UKAI_DEBUG = true;/);
+});

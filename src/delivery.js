@@ -191,7 +191,7 @@
       let r = null, err = null;
       try { r = await fetchFn(url, opts); } catch (e) { err = e; }
       if (r && r.status !== 503) return r;
-      console.log('[surasura] ' + url.split('/v1/')[1] + ' ->', r ? r.status + ' (busy)' : 'no answer: ' + err, i < WAITS.length ? '; trying again' : '; giving up');
+      globalThis.UKAI_DEBUG && console.log('[surasura] ' + url.split('/v1/')[1] + ' ->', r ? r.status + ' (busy)' : 'no answer: ' + err, i < WAITS.length ? '; trying again' : '; giving up');
       if (i >= WAITS.length) { if (r) return r; throw err; }
       await waitInterruptible(WAITS[i], sleep, shouldStop);
     }
@@ -208,7 +208,7 @@
       if (r.status === 200) return 'ok';
       if (r.status === 404) return 'gone';
       if (r.status === 413) return 'toolarge';
-      console.log('[surasura] clip ' + n + ' of job ' + job + ': HTTP ' + r.status);
+      globalThis.UKAI_DEBUG && console.log('[surasura] clip ' + n + ' of job ' + job + ': HTTP ' + r.status);
       return 'abort';
     } catch (e) {
       return 'abort';
@@ -220,7 +220,7 @@
       const r = await fetchRetry(fetchFn, BASE + '/v1/jobs/' + job + '/done', {
         method: 'POST', headers: hdr(token, { 'Content-Type': 'application/json' }), body: JSON.stringify({ failed }),
       }, sleep, shouldStop);
-      if (r.status !== 200) console.log('[surasura] done of job ' + job + ': HTTP ' + r.status);
+      if (r.status !== 200) globalThis.UKAI_DEBUG && console.log('[surasura] done of job ' + job + ': HTTP ' + r.status);
       return r.status === 200;
     } catch (e) {
       return false;

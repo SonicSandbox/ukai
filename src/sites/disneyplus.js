@@ -24,4 +24,4 @@ self.SurasuraSite = {
     return /^disney\+?$/i.test(t) ? null : t || null;
   },
 };
-console.log('[surasura] disneyplus adapter loaded');
+globalThis.UKAI_DEBUG && console.log('[surasura] disneyplus adapter loaded');

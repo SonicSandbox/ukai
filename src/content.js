@@ -2,7 +2,7 @@
 (() => {
   const P = self.SurasuraParsers;
   const S = self.SurasuraSite;
-  const log = (...a) => console.log('[surasura]', ...a);
+  const log = (...a) => globalThis.UKAI_DEBUG && console.log('[surasura]', ...a);
 
   const tracks = new Map(); // key -> {key, videoId, language, cues:Map(start|text -> cue), files, seen}
   const urlLang = {}; // url without query -> language (from the Netflix manifest)

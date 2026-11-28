@@ -25,4 +25,4 @@ self.SurasuraSite = {
     return /^netflix$/i.test(t) ? null : t || null;
   },
 };
-console.log('[surasura] netflix adapter loaded');
+globalThis.UKAI_DEBUG && console.log('[surasura] netflix adapter loaded');
