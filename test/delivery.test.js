@@ -163,3 +163,25 @@ test('a Stop is noticed during the busy waits (within half a second), not after 
   stop = false; slept = 0;
   assert.strictEqual(await D.postDone('t', 7, [], async () => ({ status: 503 }), async () => { stop = true; }, () => stop), false);
 });
+
+test('pairAsk: asked / offline / unsupported / busy', async () => {
+  const ok = fakeFetch(() => ({ status: 200, body: { pair: 'abc', code: '0042', wait_s: 600 } }));
+  assert.deepStrictEqual(await D.pairAsk('0.2.0', ok), { status: 'asked', pair: 'abc', code: '0042' });
+  assert.strictEqual(ok.calls[0][0], 'http://127.0.0.1:27631/v1/pair');
+  assert.deepStrictEqual(JSON.parse(ok.calls[0][1].body), { version: '0.2.0' });
+  assert.strictEqual((await D.pairAsk('1', fakeFetch(() => new Error('x')))).status, 'offline');
+  assert.strictEqual((await D.pairAsk('1', fakeFetch(() => ({ status: 404, body: {} })))).status, 'unsupported');
+  assert.strictEqual((await D.pairAsk('1', fakeFetch(() => ({ status: 409, body: { why: 'w' } })))).status, 'busy');
+});
+
+test('pairClaim: waiting / allowed (token) / denied / gone', async () => {
+  const f = (status, body) => fakeFetch(() => ({ status, body }));
+  assert.deepStrictEqual(await D.pairClaim('abc', f(200, { state: 'waiting' })), { status: 'waiting' });
+  assert.deepStrictEqual(await D.pairClaim('abc', f(200, { state: 'allowed', token: 'T' })), { status: 'allowed', token: 'T' });
+  assert.strictEqual((await D.pairClaim('abc', f(200, { state: 'allowed' }))).status, 'rejected'); // no token: never "paired"
+  assert.deepStrictEqual(await D.pairClaim('abc', f(200, { state: 'denied' })), { status: 'denied' });
+  assert.strictEqual((await D.pairClaim('abc', f(404, {}))).status, 'gone');
+  const g = f(200, { state: 'waiting' });
+  await D.pairClaim('a/b', g);
+  assert.strictEqual(g.calls[0][0], 'http://127.0.0.1:27631/v1/pair/a%2Fb');
+});

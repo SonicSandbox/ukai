@@ -7,8 +7,16 @@ Surasura listens on loopback only: `http://127.0.0.1:27631`. Nothing else is eve
 ## GET /v1/hello
 → `200 {"app": "surasura", "version": "<x.y.z>", "contract": 1, "languages": ["ja", "zh"]}`
 
+## Pairing (replaces copying a token)
+`POST /v1/pair` (body `{"version": "<manifest version>"}`, no token) → `{"pair": "<id>", "code": "<4 digits>", "wait_s": 600}`;
+Surasura's window asks *Allow Ukai to send to Surasura?* and shows the same code. The extension shows the code and
+looks at `GET /v1/pair/<id>` about every second: `{"state": "waiting"}` · `{"state": "denied"}` (once) ·
+`{"state": "allowed", "token": "<token>"}` (once; the extension keeps it as `X-Surasura-Token`) · `404` gone/expired ·
+`409` Surasura is asking about another extension · `403`. A new Allow replaces the pairing: the old token gets `401`,
+and the extension then offers Connect again.
+
 ## POST /v1/online-subtitle
-Header: `X-Surasura-Token: <token>` (the user copies it once from Surasura into the extension's options).
+Header: `X-Surasura-Token: <token>` (from the pairing above).
 Body (JSON, UTF-8):
 ```json
 {
