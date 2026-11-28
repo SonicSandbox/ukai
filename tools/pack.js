@@ -39,6 +39,8 @@ function stage(root) {
     if (SKIP.has(f)) continue;
     let data = fs.readFileSync(path.join(root, f));
     if (MARKED.has(f)) data = Buffer.from(stripProbe(data.toString('utf8')), 'utf8');
+    // the store build logs nothing to the console: the switch in src/debug.js is off
+    if (f === 'src/debug.js') data = Buffer.from(data.toString('utf8').replace('self.UKAI_DEBUG = true;', 'self.UKAI_DEBUG = false;'), 'utf8');
     out.set(f, data);
   }
   return out;

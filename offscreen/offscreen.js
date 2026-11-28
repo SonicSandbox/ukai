@@ -2,7 +2,7 @@
 // Records the tab's picture + sound (tabCapture stream) one clip per line and posts it to Surasura.
 const D = self.SurasuraDelivery;
 const W = self.SurasuraWalk;
-const log = (...a) => console.log('[surasura]', ...a);
+const log = (...a) => globalThis.UKAI_DEBUG && console.log('[surasura]', ...a);
 
 let status = { state: 'idle' };
 let stopFlag = false;
